@@ -56,12 +56,21 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Verify VITE_API_BASE_URL
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "::error::未设置 Secret VITE_API_BASE_URL。请先部署 Render 后端拿到 URL，再到这里配置：https://github.com/${{ github.repository }}/settings/secrets/actions"
+            exit 1
+          fi
+          echo "VITE_API_BASE_URL=$VITE_API_BASE_URL"
+
       - name: Build
         env:
-          # 从 Secret 读 Render URL；空字符串则用 vite proxy
+          # 从 Secret 读 Render URL
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           # 部署到 <user>.github.io/<repo>/ 时必须设 base path
-          # 留空时 vite.config 默认 './'（已支持相对路径）
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
 

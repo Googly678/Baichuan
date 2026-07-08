@@ -227,6 +227,13 @@ const rawApiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL?.trim();
 const API_BASE_URL = rawApiBaseUrl ? rawApiBaseUrl.replace(/\/$/, '') : '';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // 守卫：未配置后端地址时直接报错，避免请求落到 GitHub Pages 自身
+  if (!API_BASE_URL) {
+    throw new Error(
+      '[后端未配置] 请设置 VITE_API_BASE_URL 环境变量（Render 后端地址）后重新构建前端。' +
+      '当前为演示部署，参见 README 部署步骤。'
+    );
+  }
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
