@@ -222,9 +222,13 @@ export default function CaseIntake() {
                 placeholder="省 / 市 / 区"
                 changeOnSelect={false}
                 expandTrigger="hover"
-                showSearch={{ filter: (input, options) =>
-                  (options?.label || '').toString().toLowerCase().includes(input.toLowerCase())
-                }}
+                showSearch={{ filter: (input, options) => {
+                  // options 是路径数组（每个元素含 label），拼接所有 label 做匹配
+                  const labels = Array.isArray(options)
+                    ? options.map((o: any) => o?.label ?? '').join(' ')
+                    : String((options as any)?.label ?? '');
+                  return labels.toLowerCase().includes(input.toLowerCase());
+                } }}
               />
             </Form.Item>
           </Col>

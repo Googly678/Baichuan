@@ -7,6 +7,7 @@ pnpm-debug.log*
 
 # ─── Env / 密钥（务必不要提交）────────────────────
 .env
+.env.*
 .env.local
 .env.*.local
 !.env.example
