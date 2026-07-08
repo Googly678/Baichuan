@@ -16,7 +16,7 @@ services:
     plan: free
     rootDir: backend
     region: singapore      # 国内访问相对快一些
-    buildCommand: npm install && npx prisma generate
+    buildCommand: npm install && npx prisma generate --schema=./prisma/schema.prisma
     startCommand: npm run start:prod
     healthCheckPath: /health
 
