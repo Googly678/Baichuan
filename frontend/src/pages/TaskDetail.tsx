@@ -2106,7 +2106,8 @@ export default function TaskDetail() {
             icon={<PaperClipOutlined />}
             onClick={() => {
               const ref = caseData.case_no || id;
-              const url = new URL(`/attachments/${encodeURIComponent(ref || '')}`, window.location.origin).toString();
+              const baseUrl = (import.meta as any).env?.BASE_URL || '/';
+              const url = `${window.location.origin}${baseUrl.replace(/\/$/, '/')}#/attachments/${encodeURIComponent(ref || '')}`;
               const opened = window.open(url, 'claim-attachments');
               if (!opened) message.warning('浏览器拦截了附件窗口，请允许弹窗后重试。');
             }}
@@ -3398,7 +3399,10 @@ export default function TaskDetail() {
             onClick={() => {
               const ref = caseData.case_no || id;
               const taskType = effectiveActiveTask?.task_type || '';
-              const url = new URL(`/attachments/${encodeURIComponent(ref || '')}?taskType=${encodeURIComponent(taskType)}`, window.location.origin).toString();
+              // HashRouter 路由：完整 URL 形如 `${baseUrl}#/attachments/<ref>?taskType=<type>`
+              const baseUrl = (import.meta as any).env?.BASE_URL || '/';
+              const hash = `/attachments/${encodeURIComponent(ref || '')}?taskType=${encodeURIComponent(taskType)}`;
+              const url = `${window.location.origin}${baseUrl.replace(/\/$/, '/')}#${hash}`;
               const opened = window.open(url, 'claim-attachments');
               if (!opened) {
                 message.warning('浏览器拦截了单证管理窗口，请允许弹窗后重试。');
