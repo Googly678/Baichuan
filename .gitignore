@@ -1,0 +1,44 @@
+# ─── Node ───────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─── Env / 密钥（务必不要提交）────────────────────
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ─── 本地 Postgres 数据目录（不要上传数据库文件）──
+.pg-local/
+.pg-managed/
+
+# ─── 运行时数据 / 备份 ─────────────────────────
+data/
+backups/
+
+# ─── 构建产物 ───────────────────────────────────
+frontend/dist/
+backend/dist/
+
+# ─── 编辑器 / OS ─────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── 测试产物 ───────────────────────────────────
+coverage/
+*.lcov
+build-test/
+
+# ─── Prisma ─────────────────────────────────────
+backend/prisma/migrations/dev.db*
+
+# ─── Logs ───────────────────────────────────────
+*.log
+logs/

@@ -1,0 +1,717 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// JR/T 0212-2020  财产保险业务要素数据规范
+// 非车险理赔系统 — 完整关系型数据库 Schema
+// 共 17 个业务表 + 1 个 KV 配置表，涵盖：
+//   机构、险种、当事人、保单、报案、
+//   案件、查勘、定损、核赔、赔付、追偿、
+//   单证、医疗辅助、用户、审计日志
+// ============================================================
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 1  保险机构  ins_company
+//   对应规范：机构信息要素（机构代码、名称、类型、层级）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model InsCompany {
+  id           String   @id @default(uuid())
+  company_code String   @unique          // 机构代码（唯一）
+  company_name String                    // 机构全称
+  company_type String                    // HEAD=总公司 BRANCH=分公司 SUB_BRANCH=支公司
+  parent_code  String?                   // 上级机构代码（NULL 表示顶层）
+  address      String?
+  phone        String?
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  products InsProduct[]
+  policies Policy[]
+
+  @@map("ins_company")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 2  保险产品（险种）  ins_product
+//   对应规范：险种信息要素（险种代码、名称、类别）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model InsProduct {
+  id           String   @id @default(uuid())
+  product_code String   @unique          // 险种代码
+  product_name String                    // 险种名称
+  product_type String                    // LIABILITY=责任险 ACCIDENT=意外险 HEALTH=健康险 PROPERTY=财产险
+  subject_type String                    // 标的类型：PERSON / PROPERTY / VEHICLE / OTHER
+  company_id   String
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  company       InsCompany        @relation(fields: [company_id], references: [id])
+  coverageTypes InsCoverageType[]
+  policies      Policy[]
+
+  @@index([company_id])
+  @@map("ins_product")
+}
+
+// § 2.1  保险责任类型（标准条款）  ins_coverage_type
+model InsCoverageType {
+  id            String  @id @default(uuid())
+  product_id    String
+  coverage_code String                   // 责任代码
+  coverage_name String                   // 责任名称（如：医疗费用、误工损失、死亡赔偿）
+  coverage_desc String?                  // 责任描述
+  limit_amount  Decimal @db.Decimal(18, 2)   // 责任限额
+  deductible    Decimal @default(0) @db.Decimal(18, 2)  // 绝对免赔额
+
+  product         InsProduct       @relation(fields: [product_id], references: [id])
+  policyCoverages PolicyCoverage[]
+
+  @@unique([product_id, coverage_code])
+  @@map("ins_coverage_type")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 3  当事人  party / party_contact / party_bank_account
+//   对应规范：当事人信息要素（证件、联系方式、银行账户）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model Party {
+  id          String   @id @default(uuid())
+  party_type  String                    // PERSON=个人  ORGANIZATION=机构
+  id_type     String                    // IC=居民身份证 PASSPORT=护照 BIZ_LIC=营业执照 HK_MO=港澳通行证 OTHER=其他
+  id_no       String                    // 证件号码
+  name        String                    // 姓名 / 机构名称
+  gender      String?                   // M=男 F=女（仅个人）
+  birth_date  DateTime?                 // 出生日期（仅个人）
+  nationality String?                   // 国籍
+  occupation  String?                   // 职业
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  contacts            PartyContact[]
+  bankAccounts        PartyBankAccount[]
+  policiesAsHolder    Policy[]            @relation("PolicyHolder")
+  policyInsureds      PolicyInsured[]
+  policyBeneficiaries PolicyBeneficiary[]
+  claimParties        ClaimParty[]
+
+  @@unique([id_type, id_no])
+  @@index([name])
+  @@map("party")
+}
+
+// § 3.1  联系方式
+model PartyContact {
+  id            String  @id @default(uuid())
+  party_id      String
+  contact_type  String                   // MOBILE=手机 TEL=固话 EMAIL=邮箱 ADDRESS=地址 WECHAT=微信
+  contact_value String
+  is_primary    Boolean @default(false)
+
+  party Party @relation(fields: [party_id], references: [id])
+
+  @@index([party_id])
+  @@map("party_contact")
+}
+
+// § 3.2  银行账户
+model PartyBankAccount {
+  id           String   @id @default(uuid())
+  party_id     String
+  bank_name    String                   // 开户银行名称
+  bank_code    String?                  // 联行号
+  branch_name  String?                  // 支行名称
+  account_no   String                   // 银行账号
+  account_name String                   // 账户名（收款人姓名）
+  is_primary   Boolean  @default(false)
+  created_at   DateTime @default(now())
+
+  party    Party     @relation(fields: [party_id], references: [id])
+  payments Payment[]
+
+  @@index([party_id])
+  @@map("party_bank_account")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 4  保单  policy / policy_insured / policy_beneficiary
+//          policy_subject / policy_coverage
+//   对应规范：保单信息、保险标的、保险责任要素
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model Policy {
+  id             String   @id @default(uuid())
+  policy_no      String   @unique          // 保单号
+  proposal_no    String?  @unique          // 投保单号
+  product_id     String
+  company_id     String
+  holder_id      String                    // 投保人（关联 party）
+  policy_status  String   @default("VALID")  // VALID=有效 LAPSED=失效 CANCELLED=撤单 EXPIRED=到期
+  start_date     DateTime                  // 保险起期
+  end_date       DateTime                  // 保险止期
+  issue_date     DateTime                  // 签发日期
+  premium        Decimal  @db.Decimal(18, 2)   // 保险费（元）
+  insured_amount Decimal  @db.Decimal(18, 2)   // 保单总保险金额（元）
+  currency       String   @default("CNY")
+  remark         String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  product       InsProduct          @relation(fields: [product_id], references: [id])
+  company       InsCompany          @relation(fields: [company_id], references: [id])
+  holder        Party               @relation("PolicyHolder", fields: [holder_id], references: [id])
+  insureds      PolicyInsured[]
+  beneficiaries PolicyBeneficiary[]
+  subjects      PolicySubject[]
+  coverages     PolicyCoverage[]
+  claimCases    ClaimCase[]
+
+  @@index([policy_status])
+  @@index([start_date, end_date])
+  @@index([holder_id])
+  @@map("policy")
+}
+
+// § 4.1  被保险人明细（团单支持多被保险人）
+model PolicyInsured {
+  id               String   @id @default(uuid())
+  policy_id        String
+  party_id         String
+  insured_type     String   @default("PRIMARY")  // PRIMARY=主被保险人 ADDITIONAL=附加被保险人
+  insured_amount   Decimal? @db.Decimal(18, 2)   // 单人保额（团单用）
+  occupation_code  String?                        // 职业代码
+  occupation_level Int?                           // 职业等级（影响费率）
+
+  policy Policy @relation(fields: [policy_id], references: [id])
+  party  Party  @relation(fields: [party_id], references: [id])
+
+  @@index([policy_id])
+  @@index([party_id])
+  @@map("policy_insured")
+}
+
+// § 4.2  受益人
+model PolicyBeneficiary {
+  id            String  @id @default(uuid())
+  policy_id     String
+  party_id      String
+  benefit_ratio Decimal @default(100) @db.Decimal(5, 2)  // 受益比例（%）
+  benefit_order Int     @default(1)                       // 受益顺序（1=第一顺序）
+
+  policy Policy @relation(fields: [policy_id], references: [id])
+  party  Party  @relation(fields: [party_id], references: [id])
+
+  @@index([policy_id])
+  @@map("policy_beneficiary")
+}
+
+// § 4.3  保险标的
+model PolicySubject {
+  id            String   @id @default(uuid())
+  policy_id     String
+  subject_type  String                    // 标的类型：PERSON / PROPERTY / VEHICLE / OTHER
+  subject_code  String?                   // 标的编码（如车牌号、设备编号）
+  subject_name  String                    // 标的名称 / 描述
+  subject_value Decimal? @db.Decimal(18, 2)  // 标的价值（元）
+  address       String?                   // 标的所在地址（财产险）
+  attributes    Json?                     // 扩展属性（JSONB，如车型、车架号等）
+
+  policy Policy @relation(fields: [policy_id], references: [id])
+
+  @@index([policy_id])
+  @@map("policy_subject")
+}
+
+// § 4.4  保单责任细分（保额拆分）
+model PolicyCoverage {
+  id               String  @id @default(uuid())
+  policy_id        String
+  coverage_type_id String
+  limit_amount     Decimal @db.Decimal(18, 2)           // 责任限额（元）
+  deductible       Decimal @default(0) @db.Decimal(18, 2)  // 免赔额（元）
+  premium          Decimal? @db.Decimal(18, 2)           // 该责任对应保费（元）
+
+  policy       Policy          @relation(fields: [policy_id], references: [id])
+  coverageType InsCoverageType @relation(fields: [coverage_type_id], references: [id])
+
+  @@index([policy_id])
+  @@map("policy_coverage")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 5  报案（FNOL — First Notice of Loss）  fnol
+//   对应规范：报案信息要素（报案号、时间、渠道、出险信息）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model Fnol {
+  id                String   @id @default(uuid())
+  fnol_no           String   @unique              // 报案号（系统生成）
+  report_time       DateTime @default(now())      // 报案时间
+  report_channel    String   @default("SYSTEM")   // 报案渠道：PHONE=电话 ONLINE=网络 AGENT=代理人 SYSTEM=系统
+  reporter_name     String                         // 报案人姓名
+  reporter_phone    String                         // 报案人联系电话
+  reporter_relation String?                        // 报案人与被保险人关系
+  accident_time     DateTime                       // 出险时间
+  accident_location String                         // 出险地点
+  accident_desc     String                         // 出险经过（简述）
+  accident_type     String                         // 事故类型代码
+  policy_no         String?                        // 关联保单号（报案时可能未确认）
+  estimated_amount  Decimal? @db.Decimal(18, 2)   // 预估损失金额（元）
+  fnol_status       String   @default("NEW")       // NEW=新建 ACCEPTED=已立案 REJECTED=拒绝立案 CLOSED=已结案
+  remark            String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  claimCase ClaimCase?
+
+  @@index([report_time])
+  @@index([fnol_status])
+  @@map("fnol")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 6  理赔案件  claim_case / claim_party / claim_task
+//   对应规范：案件信息要素（案件号、状态、责任认定、金额汇总）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model ClaimCase {
+  id                      String    @id @default(uuid())
+  case_no                 String    @unique              // 案件号
+  fnol_id                 String?   @unique              // 关联报案（1:1）
+  policy_id               String?                        // 关联保单
+  // — 事故基本信息
+  accident_time           DateTime                       // 出险时间
+  accident_location       String                         // 出险地点
+  accident_type           String                         // 事故类型
+  accident_desc           String?                        // 事故经过
+  // — 案件状态
+  case_status             String    @default("PENDING_SPLIT")
+  // PENDING_SPLIT=待拆分 REGISTERED=已立案 INVESTIGATING=查勘中
+  // ASSESSING=定损中 REVIEWING=核赔中 APPROVED=已核赔 PAID=已赔付
+  // CLOSED=已结案 REJECTED=拒赔
+  // — 责任认定
+  has_litigation          Boolean   @default(false)      // 是否涉诉
+  litigation_desc         String?
+  liability_ratio         Decimal?  @db.Decimal(5, 2)   // 责任比例（%）
+  // — 查勘标志
+  has_investigation       Boolean   @default(false)
+  investigation_blocking  Boolean   @default(false)      // 是否无法查勘
+  // — 金额汇总（冗余字段，供列表快速展示）
+  reg_amount              Decimal?  @db.Decimal(18, 2)  // 登记金额
+  assessed_amount         Decimal?  @db.Decimal(18, 2)  // 核定金额
+  paid_amount             Decimal?  @db.Decimal(18, 2)  // 实付金额
+  // — 关键时间节点
+  reg_approved_time       DateTime?
+  agreement_approved_time DateTime?
+  survey_approved_time    DateTime?
+  closed_time             DateTime?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  fnol          Fnol?           @relation(fields: [fnol_id], references: [id])
+  policy        Policy?         @relation(fields: [policy_id], references: [id])
+  parties       ClaimParty[]
+  tasks         ClaimTask[]
+  investigations Investigation[]
+  subrogations  Subrogation[]
+  documents     ClaimDocument[]
+  auditLogs     AuditLog[]
+
+  @@index([case_status])
+  @@index([case_status, created_at])
+  @@index([accident_time])
+  @@index([created_at])
+  @@map("claim_case")
+}
+
+// § 6.1  案件当事方（多角色：被保险人、索赔人、第三者、证人）
+model ClaimParty {
+  id           String  @id @default(uuid())
+  case_id      String
+  party_id     String
+  party_role   String                    // INSURED=被保险人 CLAIMANT=索赔人 THIRD_PARTY=第三者 WITNESS=证人
+  injury_level String?                   // 伤亡等级：DEATH=死亡 DISABLED=伤残 INJURED=受伤 NONE=无人伤
+  is_rider     Boolean @default(false)   // 是否骑手/员工
+  rider_type   String?                   // 专送 / 众包
+
+  case  ClaimCase @relation(fields: [case_id], references: [id])
+  party Party     @relation(fields: [party_id], references: [id])
+
+  @@index([case_id])
+  @@index([case_id, is_rider])
+  @@map("claim_party")
+}
+
+// § 6.2  理赔任务（按险种拆分，支持一案多险种并赔）
+model ClaimTask {
+  id              String   @id @default(uuid())
+  case_id         String
+  task_no         String   @unique
+  task_type       String                  // rider_injury=骑手人伤 third_injury=第三方人伤 third_property=第三方财产
+  insurance_type  String                  // employer=雇主险 group_accident=团意险 third_party=第三者责任险
+  business_line   String                  // injury=人伤 property=财产
+  task_status     String   @default("PENDING")
+  flow_status     String   @default("PROCESSING")
+  // PROCESSING=处理中 SUBMITTED=已提交 UNDER_REVIEW=审核中 RETURNED=已退回 ASSESSED=已定损 FINISHED=已完成
+  assigned_to     String?                 // 经办人（工号/姓名）
+  assessed_amount Decimal  @default(0) @db.Decimal(18, 2)  // 定损金额
+  approved_amount Decimal  @default(0) @db.Decimal(18, 2)  // 核赔金额
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  case           ClaimCase        @relation(fields: [case_id], references: [id])
+  lossItems      LossItem[]
+  assessments    LossAssessment[]
+  reviews        ClaimReview[]
+  payments       Payment[]
+  medicalRecords MedicalRecord[]
+
+  @@index([case_id])
+  @@index([task_status])
+  @@map("claim_task")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 7  查勘  investigation
+//   对应规范：查勘信息要素（查勘号、人员、时间、结论）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model Investigation {
+  id                 String    @id @default(uuid())
+  investigation_no   String    @unique
+  case_id            String
+  investigator       String                    // 查勘人员
+  investigation_time DateTime                  // 查勘时间
+  investigation_type String    @default("FIELD")  // FIELD=现场 REMOTE=远程 DESK=案头
+  location           String?                   // 查勘地点
+  conclusion         String?                   // 查勘结论
+  is_fraud_suspected Boolean   @default(false) // 是否疑似欺诈
+  fraud_desc         String?                   // 欺诈描述
+  inv_status         String    @default("PENDING")  // PENDING=待查勘 ONGOING=查勘中 COMPLETED=已完成
+  completed_at       DateTime?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+
+  case ClaimCase @relation(fields: [case_id], references: [id])
+
+  @@index([case_id])
+  @@map("investigation")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 8  定损  loss_assessment / loss_item / medical_record
+//   对应规范：定损信息要素（定损号、金额、明细、医疗信息）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model LossAssessment {
+  id                String   @id @default(uuid())
+  assessment_no     String   @unique
+  task_id           String
+  assessor          String                    // 定损人员
+  assessment_time   DateTime                  // 定损时间
+  total_loss        Decimal  @db.Decimal(18, 2)   // 定损总额（元）
+  deductible        Decimal  @default(0) @db.Decimal(18, 2)  // 应扣免赔额（元）
+  net_loss          Decimal  @db.Decimal(18, 2)   // 净定损金额（元）
+  assessment_status String   @default("DRAFT")
+  // DRAFT=草稿 SUBMITTED=已提交 APPROVED=已审核 REJECTED=已退回
+  remark            String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  task      ClaimTask  @relation(fields: [task_id], references: [id])
+  lossItems LossItem[]
+
+  @@index([task_id])
+  @@map("loss_assessment")
+}
+
+// § 8.1  定损明细项（损失项目清单）
+model LossItem {
+  id              String   @id @default(uuid())
+  task_id         String
+  assessment_id   String?
+  loss_category   String
+  // MEDICAL=医疗费 LOST_WAGES=误工费 NURSING=护理费 TRANSPORT=交通费
+  // FUNERAL=丧葬费 DISABILITY=伤残赔偿 DEATH=死亡赔偿 PROPERTY=财产损失 OTHER=其他
+  loss_type       String                    // 损失子类目
+  description     String                    // 项目描述
+  claimed_amount  Decimal  @db.Decimal(18, 2)   // 申请金额（元）
+  standard_amount Decimal? @db.Decimal(18, 2)   // 参考标准金额（元）
+  approved_amount Decimal? @db.Decimal(18, 2)   // 核定金额（元）
+  duration        Int?                          // 天数/期数（误工费、护理费等）
+  daily_rate      Decimal? @db.Decimal(18, 2)   // 日标准（元/天）
+  formula         String?                        // 计算公式说明
+  is_audited      Boolean  @default(false)
+  remark          String?
+
+  task       ClaimTask       @relation(fields: [task_id], references: [id])
+  assessment LossAssessment? @relation(fields: [assessment_id], references: [id])
+
+  @@index([task_id])
+  @@index([assessment_id])
+  @@map("loss_item")
+}
+
+// § 8.2  医疗记录（人伤专项）
+model MedicalRecord {
+  id                String    @id @default(uuid())
+  task_id           String
+  hospital_code     String?                   // 就诊医院编码
+  hospital_name     String                    // 就诊医院名称
+  admission_date    DateTime?                 // 入院日期
+  discharge_date    DateTime?                 // 出院日期
+  hospitalized_days Int?                      // 住院天数
+  diagnosis_code    String?                   // ICD-10 诊断编码
+  diagnosis_name    String                    // 主要诊断名称
+  injury_part       String?                   // 受伤部位
+  injury_degree     String?                   // 伤情程度：重伤/中伤/轻伤
+  treatment_desc    String?                   // 治疗情况说明
+  medical_expense   Decimal?  @db.Decimal(18, 2)  // 医疗费用合计（元）
+  created_at        DateTime  @default(now())
+
+  task ClaimTask @relation(fields: [task_id], references: [id])
+
+  @@index([task_id])
+  @@map("medical_record")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 9  核赔  claim_review
+//   对应规范：核赔信息要素（核赔号、金额、决定、核赔人）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model ClaimReview {
+  id              String   @id @default(uuid())
+  review_no       String   @unique
+  task_id         String
+  reviewer        String                    // 核赔人员
+  review_time     DateTime                  // 核赔时间
+  review_type     String   @default("INITIAL")  // INITIAL=初审 SECOND=复审 SPECIAL=特批
+  approved_amount Decimal  @db.Decimal(18, 2)   // 核赔金额（元）
+  decision        String                    // APPROVED=批准 REJECTED=拒赔 PARTIAL=部分赔付 RETURNED=退回补充材料
+  decision_reason String                    // 核赔意见
+  created_at      DateTime @default(now())
+
+  task ClaimTask @relation(fields: [task_id], references: [id])
+
+  @@index([task_id])
+  @@map("claim_review")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 10  赔付  payment
+//   对应规范：赔付信息要素（赔付单号、金额、收款人、账户、状态）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model Payment {
+  id              String    @id @default(uuid())
+  payment_no      String    @unique              // 赔付单号
+  task_id         String
+  bank_account_id String?                        // 关联收款银行账户（可选）
+  payment_type    String                         // TRANSFER=银行转账 CHECK=支票 CASH=现金
+  payment_amount  Decimal   @db.Decimal(18, 2)  // 赔付金额（元）
+  payee_name      String                         // 收款人姓名
+  payee_id_no     String?                        // 收款人证件号
+  bank_name       String?                        // 开户银行
+  bank_account    String?                        // 银行账号
+  payment_status  String    @default("PENDING")
+  // PENDING=待审核 APPROVED=已审核 PROCESSING=转账中 COMPLETED=已完成 FAILED=失败 CANCELLED=已取消
+  payment_time    DateTime?                      // 实际支付时间
+  remark          String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  task        ClaimTask         @relation(fields: [task_id], references: [id])
+  bankAccount PartyBankAccount? @relation(fields: [bank_account_id], references: [id])
+
+  @@index([task_id])
+  @@index([payment_status])
+  @@map("payment")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 11  追偿  subrogation
+//   对应规范：追偿信息要素（追偿号、类型、对象、金额、状态）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model Subrogation {
+  id               String    @id @default(uuid())
+  subrogation_no   String    @unique              // 追偿号
+  case_id          String
+  subrogation_type String                         // THIRD_PARTY=第三方追偿 WORKCOMP=工伤代位 OTHER=其他
+  target_name      String                         // 追偿对象名称
+  target_id_no     String?                        // 追偿对象证件号
+  claimed_amount   Decimal   @db.Decimal(18, 2)  // 追偿金额（元）
+  recovered_amount Decimal   @default(0) @db.Decimal(18, 2)  // 已追回金额（元）
+  sub_status       String    @default("PENDING")
+  // PENDING=待处理 ONGOING=追偿中 CONCLUDED=已结案 ABANDONED=已放弃
+  started_at       DateTime?
+  concluded_at     DateTime?
+  remark           String?
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  case ClaimCase @relation(fields: [case_id], references: [id])
+
+  @@index([case_id])
+  @@map("subrogation")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 12  单证 / 附件  claim_document
+//   对应规范：单证信息要素（单证类别、影像、OCR）
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model ClaimDocument {
+  id           String   @id @default(uuid())
+  case_id      String
+  task_id      String?                    // 可关联至具体任务
+  doc_category String                     // identity=身份证件 medical=医疗单据 accident=事故材料 legal=法律文书 other=其他
+  doc_type     String                     // 单证具体类型（如：出院小结、诊断书、病历等）
+  doc_name     String                     // 文件名称
+  file_type    String                     // image / pdf / video / document
+  file_size    Int?                       // 文件大小（字节）
+  file_url     String?                    // 文件存储路径（生产 OSS/对象存储）
+  file_data    String?                    // Base64 数据（演示模式）
+  ocr_status   String?                    // PENDING=待识别 PROCESSING=识别中 DONE=已完成 FAILED=失败
+  ocr_result   Json?                      // OCR 识别结果（JSONB）
+  uploader     String?
+  uploaded_at  DateTime @default(now())
+
+  case ClaimCase @relation(fields: [case_id], references: [id])
+
+  @@index([case_id])
+  @@index([doc_category])
+  @@map("claim_document")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 13  医疗辅助数据  hospital / icd10_code / work_injury_standard
+//   参考：定点医疗机构、ICD-10、工伤赔偿标准
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model Hospital {
+  id            String   @id @default(uuid())
+  hospital_code String   @unique          // 医疗机构代码
+  hospital_name String                    // 医院名称
+  hospital_level String?                  // 三甲 / 三级 / 二甲 / 二级 / 一级
+  hospital_type  String?                  // 综合 / 专科 / 社区
+  province      String?
+  city          String?
+  address       String?
+  phone         String?
+  is_designated Boolean  @default(true)   // 是否定点医疗机构
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  @@index([province, city])
+  @@index([hospital_name])
+  @@map("hospital")
+}
+
+model Icd10Code {
+  id          String  @id @default(uuid())
+  code        String  @unique              // ICD-10 编码（如 S72.000）
+  name_cn     String                       // 中文诊断名称
+  name_en     String?                      // 英文诊断名称
+  category    String?                      // 章节分类（如 S=损伤 T=中毒）
+  parent_code String?                      // 上级分类编码
+  is_leaf     Boolean @default(true)       // 是否末级编码
+  is_active   Boolean @default(true)
+
+  @@index([category])
+  @@index([name_cn])
+  @@map("icd10_code")
+}
+
+model WorkInjuryStandard {
+  id               String    @id @default(uuid())
+  standard_code    String    @unique
+  standard_name    String
+  standard_type    String                         // DEATH=死亡赔偿 DISABILITY=伤残赔偿 MEDICAL=医疗 WORKSTOP=停工留薪 NURSING=护理
+  base_amount      Decimal?  @db.Decimal(18, 2)  // 基础赔偿金额（元）
+  multiplier       Decimal?  @db.Decimal(8, 4)   // 赔偿倍率（如 20 倍年收入）
+  max_amount       Decimal?  @db.Decimal(18, 2)  // 赔偿上限（元）
+  min_amount       Decimal?  @db.Decimal(18, 2)  // 赔偿下限（元）
+  disability_level Int?                           // 伤残等级（1-10；NULL=不分等级）
+  region           String?                        // 适用地区（NULL=全国通用）
+  effective_date   DateTime                       // 标准生效日期
+  expire_date      DateTime?                      // 标准失效日期（NULL=仍有效）
+  law_reference    String?                        // 法律依据（条文引用）
+  is_active        Boolean   @default(true)
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  @@index([standard_type])
+  @@index([disability_level])
+  @@map("work_injury_standard")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 14  系统用户  sys_user
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model SysUser {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  display_name String
+  email        String?  @unique
+  phone        String?
+  department   String?
+  role         String   @default("STAFF")  // ADMIN=管理员 MANAGER=主管 STAFF=经办人 READONLY=只读
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  @@map("sys_user")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 15  操作审计日志  audit_log
+//   对应规范：业务操作的完整审计链
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model AuditLog {
+  id          String   @id @default(uuid())
+  case_id     String?                    // 关联案件（可选，支持非案件维度操作）
+  entity_type String                     // 操作实体类型（如 ClaimCase / Payment / Policy）
+  entity_id   String                     // 操作实体主键
+  action      String                     // 操作动作：CREATE / UPDATE / DELETE / APPROVE / REJECT / SUBMIT 等
+  operator    String                     // 操作人（工号或用户名）
+  operator_ip String?                    // 操作 IP 地址
+  detail      Json?                      // 变更详情（前值 / 后值对比，JSONB）
+  created_at  DateTime @default(now())
+
+  case ClaimCase? @relation(fields: [case_id], references: [id])
+
+  @@index([entity_type, entity_id])
+  @@index([case_id])
+  @@index([created_at])
+  @@map("audit_log")
+}
+
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// § 16  通用 KV 配置存储  app_kv_store（保留）
+//   用于系统参数配置、临时数据兼容层
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+model AppKvStore {
+  kv_namespace String
+  kv_key       String
+  kv_value     Json
+  updated_at   DateTime @default(now()) @updatedAt
+
+  @@id([kv_namespace, kv_key])
+  @@map("app_kv_store")
+}

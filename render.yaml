@@ -1,0 +1,42 @@
+# Render Blueprint — 骑手理赔系统后端
+#
+# 使用方式：
+#   1. 注册 https://render.com 并连接 GitHub
+#   2. New → Blueprint → 选本仓库 → render 自动读此文件
+#   3. 部署完成后，把 URL（如 rider-api-xxx.onrender.com）填到：
+#      - 本仓库的 GitHub Secret: VITE_API_BASE_URL = https://rider-api-xxx.onrender.com
+#      - 本文件第 28 行（注释里也写）
+#
+# ⚠️ 部署前请把下方 {{GITHUB_USER}} 和 {{GITHUB_REPO}} 替换成你的真实值
+#    （也可以不替换：ALLOWED_ORIGINS 用通配符 *.github.io 已经覆盖大多数情况）
+services:
+  - type: web
+    name: rider-claims-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    region: singapore      # 国内访问相对快一些
+    buildCommand: npm install && npx prisma generate
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+
+    # 环境变量
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # ⚠️ 必须替换成你的 GitHub Pages 完整域名
+      # 本项目部署后地址：https://googly678.github.io/Baichuan/
+      - key: ALLOWED_ORIGINS
+        value: https://googly678.github.io
+
+      # Render 免费档无数据库，开启 JSON 回退模式
+      # ⚠️ 警告：每次 deploy / 容器重启 数据会丢
+      - key: ALLOW_JSON_FALLBACK
+        value: "true"
+
+      # 监听端口（Render 会自动注入 PORT，不设也行）
+      - key: PORT
+        value: "3000"
+
+    autoDeploy: true   # push 到 main 自动部署

@@ -1,0 +1,39 @@
+{
+  "name": "rider-claims-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "db:up": "powershell -ExecutionPolicy Bypass -File ./scripts/ensure-db.ps1",
+    "start": "npm run db:up && ts-node src/index.ts",
+    "start:prod": "ts-node src/index.ts",
+    "dev": "npm run db:up && nodemon --watch src --ext ts,json src/index.ts",
+    "icd:import": "ts-node src/scripts/importIcd10.ts",
+    "db:push": "prisma db push",
+    "db:seed": "ts-node prisma/seed.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:status": "prisma migrate status",
+    "db:backup": "powershell -ExecutionPolicy Bypass -File ./scripts/backup-db.ps1",
+    "db:restore": "powershell -ExecutionPolicy Bypass -File ./scripts/restore-db.ps1",
+    "db:drill": "powershell -ExecutionPolicy Bypass -File ./scripts/drill-backup-restore.ps1",
+    "db:backup:register": "powershell -ExecutionPolicy Bypass -File ./scripts/register-daily-backup-task.ps1"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.0.0",
+    "bullmq": "^4.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "ioredis": "^5.3.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.0.0",
+    "nodemon": "^3.0.0",
+    "prisma": "^5.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.0"
+  }
+}

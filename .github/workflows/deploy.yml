@@ -1,0 +1,85 @@
+# GitHub Pages 自动部署
+#
+# 工作流：
+#   1. push 到 main → Actions 自动跑
+#   2. install → build（注入 VITE_API_BASE_URL + VITE_BASE_PATH）
+#   3. 上传 frontend/dist → 部署到 GitHub Pages
+#
+# ⚠️ 部署前必须做的事：
+#   1. 仓库 Settings → Secrets and variables → Actions → New repository secret
+#      - Name:  VITE_API_BASE_URL
+#        Value: https://rider-claims-api-xxx.onrender.com  （你的 Render URL）
+#   2. 仓库 Settings → Pages → Source: GitHub Actions
+#
+# 测试本地构建：
+#   cd frontend
+#   VITE_API_BASE_URL=https://test.example.com VITE_BASE_PATH=/仓库名/ npm run build
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # 允许手动触发
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同一部署并发时取消旧的
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        env:
+          # 从 Secret 读 Render URL；空字符串则用 vite proxy
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          # 部署到 <user>.github.io/<repo>/ 时必须设 base path
+          # 留空时 vite.config 默认 './'（已支持相对路径）
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
