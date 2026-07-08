@@ -98,6 +98,12 @@ function buildMenu(role: string): any[] {
   if (!isLitigationOnly) {
     items.push({ key: '/cases', icon: <FileSearchOutlined />, label: '案件查询' });
   }
+  // 客服专员专属：新建接件 + 新建报案
+  // （与"报案工作台"配合：工作台是"接报案后的池子"，这两个是"开始接件/报案"入口）
+  if (role === 'CUSTOMER_SERVICE') {
+    items.push({ key: '/intake', icon: <PlusOutlined />, label: '新建接件' });
+    items.push({ key: '/create', icon: <PlusOutlined />, label: '新建报案' });
+  }
   // 管理员专属：辅助管理（兼容旧路由）
   if (role === 'ADMIN') {
     items.push({
