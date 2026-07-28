@@ -4,7 +4,7 @@
  * - 列出复勘 / 调查旧表数据（标 deprecated）
  * - 提供审核/完结操作
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import {
   Card, Table, Tag, Button, Space, Row, Col, Statistic, message, Select, Input,
 } from 'antd';
@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   AuditOutlined, ReloadOutlined, PlusOutlined, ToolOutlined,
 } from '@ant-design/icons';
+import { RoleContext } from '../../App';
 import { api, type AuxiliaryTask, type AuxiliaryType, type AuxiliaryStatus } from '../../utils/api';
 
 const TYPE_TAG: Record<AuxiliaryType, { color: string; label: string }> = {
@@ -27,6 +28,7 @@ const STATUS_TAG: Record<AuxiliaryStatus, { color: string; label: string }> = {
 
 export default function AuxiliaryDashboard() {
   const navigate = useNavigate();
+  const { role } = useContext(RoleContext);
   const [items, setItems] = useState<AuxiliaryTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<AuxiliaryType | undefined>();
@@ -63,27 +65,29 @@ export default function AuxiliaryDashboard() {
     blocking: items.filter((i) => i.blocking && (i.status === 'PENDING' || i.status === 'UNDER_REVIEW')).length,
     completed: items.filter((i) => i.status === 'COMPLETED').length,
   };
+  const isAuditorRole = role === 'INJURY_AUDITOR' || role === 'PROPERTY_AUDITOR';
+  const isSurveyorRole = role === 'INJURY_SURVEYOR' || role === 'PROPERTY_SURVEYOR';
 
   const columns = [
-    { title: '任务ID', dataIndex: 'id', width: 110, render: (v: string) => v.slice(-8) },
-    { title: '案件号', dataIndex: 'case_no', width: 150 },
+    { title: '任务ID', dataIndex: 'id', width: 120, render: (v: string) => v.slice(-8) },
+    { title: '案件号', dataIndex: 'case_no', width: 180 },
     {
-      title: '类型', dataIndex: 'auxiliary_type', width: 80,
+      title: '类型', dataIndex: 'auxiliary_type', width: 90,
       render: (v: AuxiliaryType) => <Tag color={TYPE_TAG[v]?.color}>{TYPE_TAG[v]?.label || v}</Tag>,
     },
-    { title: '标题', dataIndex: 'title', ellipsis: true },
-    { title: '原因', dataIndex: 'reason', ellipsis: true, width: 200 },
+    { title: '标题', dataIndex: 'title', width: 220, ellipsis: false },
+    { title: '原因', dataIndex: 'reason', ellipsis: false, width: 260 },
     {
-      title: '状态', dataIndex: 'status', width: 90,
+      title: '状态', dataIndex: 'status', width: 100,
       render: (v: AuxiliaryStatus) => <Tag color={STATUS_TAG[v]?.color}>{STATUS_TAG[v]?.label || v}</Tag>,
     },
     {
-      title: '阻塞主任务', dataIndex: 'blocking', width: 90,
+      title: '阻塞主任务', dataIndex: 'blocking', width: 110,
       render: (v: boolean) => v ? <Tag color="red">阻塞</Tag> : <Tag>否</Tag>,
     },
-    { title: '发起人', dataIndex: 'operator', width: 110 },
-    { title: '审核人', dataIndex: 'reviewer', width: 110 },
-    { title: '创建时间', dataIndex: 'created_at', width: 160 },
+    { title: '发起人', dataIndex: 'operator', width: 120 },
+    { title: '审核人', dataIndex: 'reviewer', width: 120 },
+    { title: '创建时间', dataIndex: 'created_at', width: 180 },
     {
       title: '操作', width: 220, fixed: 'right' as const,
       render: (_: any, row: AuxiliaryTask) => (
@@ -155,9 +159,11 @@ export default function AuxiliaryDashboard() {
             />
             <Input.Search size="small" style={{ width: 200 }} placeholder="搜索案件/标题/原因" onChange={(e) => setKeyword(e.target.value)} />
             <Button size="small" icon={<ReloadOutlined />} onClick={reload}>刷新</Button>
-            <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate('/re-inspection')}>
-              旧版复勘（deprecated）
-            </Button>
+            {!isSurveyorRole && (
+              <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate('/re-inspection')}>
+                {isAuditorRole ? '新建复勘' : '旧版复勘（deprecated）'}
+              </Button>
+            )}
           </Space>
         }
       >
@@ -168,20 +174,23 @@ export default function AuxiliaryDashboard() {
           size="small"
           loading={loading}
           pagination={{ pageSize: 10, showSizeChanger: false }}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1500 }}
+          tableLayout="fixed"
           locale={{ emptyText: '暂无补充任务，可在案件详情页发起复勘/调查' }}
         />
       </Card>
 
-      <Card
-        title={<Space><AuditOutlined style={{ color: '#999' }} /><span style={{ color: '#999' }}>旧版辅助任务（deprecated）</span></Space>}
-        bordered={false}
-      >
-        <Space>
-          <Button size="small" onClick={() => navigate('/re-inspection')}>复勘管理（旧表）</Button>
-          <Button size="small" onClick={() => navigate('/investigation')}>调查管理（旧表）</Button>
-        </Space>
-      </Card>
+      {!isAuditorRole && (
+        <Card
+          title={<Space><AuditOutlined style={{ color: '#999' }} /><span style={{ color: '#999' }}>旧版辅助任务（deprecated）</span></Space>}
+          bordered={false}
+        >
+          <Space>
+            <Button size="small" onClick={() => navigate('/re-inspection')}>复勘管理（旧表）</Button>
+            <Button size="small" onClick={() => navigate('/investigation')}>调查管理（旧表）</Button>
+          </Space>
+        </Card>
+      )}
     </Space>
   );
 }

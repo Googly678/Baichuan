@@ -43,13 +43,13 @@ export const WORKBENCHES: WorkbenchDef[] = [
 /** 角色 → 工作台可见性映射（按 `key` 过滤 WORKBENCHES） */
 export const ROLE_WORKBENCHES: Record<string, WorkbenchKey[]> = {
   CUSTOMER_SERVICE:    ['claim'],
-  INJURY_SURVEYOR:     ['claim'],
+  INJURY_SURVEYOR:     ['claim', 'auxiliary'],
   INJURY_AUDITOR:      ['audit', 'auxiliary'],
-  PROPERTY_SURVEYOR:   ['claim'],
+  PROPERTY_SURVEYOR:   ['claim', 'auxiliary'],
   PROPERTY_AUDITOR:    ['audit', 'auxiliary'],
   LITIGATION_OPERATOR: ['litigation'],
   LITIGATION_AUDITOR:  ['litigation', 'auxiliary'],
-  ADMIN:               ['claim', 'audit', 'litigation', 'auxiliary', 'settings'],
+  ADMIN:               ['litigation', 'auxiliary', 'settings'],
 };
 
 // ─── 车辆类型 ────────────────────────────────────────────

@@ -42,11 +42,10 @@ import { AttachmentCategory, ClaimCase, CoreClaimRecord, TaskItem } from './type
 
 const app = express();
 
-// CORS 白名单：本地 + GitHub Pages 部署
+// CORS 白名单：本地开发 + GitHub Pages + Render 部署
 // 多个域名用逗号分隔，通过 ALLOWED_ORIGINS 环境变量配置
-// 默认放行 localhost:* + GitHub Pages
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ||
-  'http://localhost:5174,http://127.0.0.1:5174,http://localhost:3000,https://*.github.io'
+  'http://localhost:5174,http://127.0.0.1:5174,http://localhost:3000,https://googly678.github.io,https://*.github.io'
 ).split(',').map(s => s.trim()).filter(Boolean);
 
 app.use(cors({

@@ -553,7 +553,6 @@ export default function Dashboard({ workbenchKey }: { workbenchKey?: import('../
               title={<Space><MedicineBoxOutlined style={{ color: '#2db7f5' }} /><span>人伤条线任务池</span></Space>}
               bordered={false}
               bodyStyle={{ padding: '8px 0' }}
-              extra={<Button size="small" type="primary" onClick={() => navigate('/create')}>新建报案</Button>}
             >
               <Tabs
                 size="small"
@@ -599,7 +598,7 @@ export default function Dashboard({ workbenchKey }: { workbenchKey?: import('../
           bordered={false}
           bodyStyle={{ padding: '8px 0' }}
           extra={
-            (role === 'CUSTOMER_SERVICE' || role === 'INJURY_SURVEYOR' || role === 'PROPERTY_SURVEYOR') && (
+            role === 'CUSTOMER_SERVICE' && (
               <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate('/create')}>
                 新建报案
               </Button>

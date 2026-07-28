@@ -33,6 +33,9 @@ const WB_PATH: Record<WorkbenchKey, string> = {
 /** 登录后默认跳到当前角色第一个可见工作台 */
 function RoleDefaultRedirect() {
   const { role } = useContext(RoleContext);
+  if (role === 'ADMIN') {
+    return <Navigate to="/cases" replace />;
+  }
   const first = ROLE_WORKBENCHES[role]?.[0];
   const target = first ? WB_PATH[first] : '/dashboard';
   return <Navigate to={target} replace />;

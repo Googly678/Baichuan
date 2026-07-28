@@ -55,7 +55,7 @@ const ROLE_DEFAULT_PATH: Record<string, string> = {
   PROPERTY_AUDITOR:    '/dashboard/audit',
   LITIGATION_OPERATOR: '/dashboard/litigation',
   LITIGATION_AUDITOR:  '/dashboard/litigation',
-  ADMIN:               '/dashboard/claim',
+  ADMIN:               '/cases',
 };
 
 const ROLE_AVATAR_COLOR: Record<string, string> = {
@@ -96,7 +96,7 @@ function buildMenu(role: string): any[] {
   const isLitigationOnly = role === 'LITIGATION_OPERATOR' || role === 'LITIGATION_AUDITOR';
   const items: any[] = [...wbItems];
   if (!isLitigationOnly) {
-    items.push({ key: '/cases', icon: <FileSearchOutlined />, label: '案件查询' });
+    items.push({ key: '/cases', icon: <FileSearchOutlined />, label: role === 'ADMIN' ? '案件查询工作台' : '案件查询' });
   }
   // 客服专员专属：新建接件 + 新建报案
   // （与"报案工作台"配合：工作台是"接报案后的池子"，这两个是"开始接件/报案"入口）

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import {
   Card,
   Table,
@@ -19,6 +19,7 @@ import {
 } from 'antd';
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
+import { RoleContext } from '../App';
 import { api, ReInspectionTask, ReInspectionStatus } from '../utils/api';
 
 const STATUS_OPTIONS: { value: ReInspectionStatus; label: string; color: string }[] = [
@@ -38,6 +39,7 @@ function toDayjs(value?: string) {
 }
 
 export default function ReInspectionPage() {
+  const { role } = useContext(RoleContext);
   const [items, setItems] = useState<ReInspectionTask[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState<ReInspectionStatus | ''>('');
@@ -46,6 +48,7 @@ export default function ReInspectionPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [viewing, setViewing] = useState<ReInspectionTask | null>(null);
   const [form] = Form.useForm();
+  const canCreateReInspection = role === 'ADMIN' || role === 'INJURY_AUDITOR' || role === 'PROPERTY_AUDITOR';
 
   const fetchData = async () => {
     setLoading(true);
@@ -151,7 +154,9 @@ export default function ReInspectionPage() {
             options={STATUS_OPTIONS}
           />
           <Button icon={<ReloadOutlined />} onClick={fetchData}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建复勘</Button>
+          {canCreateReInspection && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新建复勘</Button>
+          )}
         </Space>
       }
     >
