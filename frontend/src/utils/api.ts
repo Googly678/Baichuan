@@ -224,7 +224,8 @@ export interface AuxiliaryTask {
 }
 
 const rawApiBaseUrl = (import.meta as any).env?.VITE_API_BASE_URL?.trim();
-const API_BASE_URL = rawApiBaseUrl ? rawApiBaseUrl.replace(/\/$/, '') : '';
+const FALLBACK_API_BASE_URL = 'https://rider-claims-api.onrender.com';
+const API_BASE_URL = (rawApiBaseUrl || FALLBACK_API_BASE_URL).replace(/\/$/, '');
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // 守卫：未配置后端地址时直接报错，避免请求落到 GitHub Pages 自身
