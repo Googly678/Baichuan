@@ -20,7 +20,7 @@ import {
 import VehiclePartsCard from '../components/VehiclePartsCard';
 import LaborFeeCard, { type LaborOrderItem } from '../components/LaborFeeCard';
 import type { ClaimCase, LossItem, CaseStatus, PaymentInfoItem, TaskItem } from '../types/claim';
-import { api, type HospitalSearchItem, type Icd10SearchItem, type WorkInjuryStandardResponse } from '../utils/api';
+import { api, type RegionNode, type HospitalSearchItem, type Icd10SearchItem, type WorkInjuryStandardResponse } from '../utils/api';
 
 const { Text, Title } = Typography;
 const { confirm } = Modal;
@@ -959,6 +959,17 @@ export default function TaskDetail() {
     if (!Number.isFinite(a) || !Number.isFinite(d) || d < a) return 0;
     return Math.floor((d - a) / (24 * 60 * 60 * 1000));
   };
+
+  // 事故地区级联（使用 /regions API，含省→市→区级联）
+  const [regionOptions, setRegionOptions] = useState<RegionNode[]>([]);
+  const [accidentProvince, setAccidentProvince] = useState<RegionNode | null>(null);
+  const [accidentCity, setAccidentCity] = useState<RegionNode | null>(null);
+
+  useEffect(() => {
+    api.getRegions()
+      .then((data) => setRegionOptions(Array.isArray(data) ? data : []))
+      .catch((err) => console.warn('[REGION] 加载行政区字典失败：', err?.message || err));
+  }, []);
 
   const provinceOptions = hospitalProvinceOptions;
   const cityOptions = hospitalCityOptions;
@@ -2354,9 +2365,9 @@ export default function TaskDetail() {
               <Col xs={24} md={8}><div className="field-label">事故类型</div><Select disabled={!canEditSurveyForm} value={accidentForm.accident_type} options={[{ value: '单方事故', label: '单方事故' }, { value: '双方事故', label: '双方事故' }, { value: '多方事故', label: '多方事故' }]} onChange={(v) => setAccidentForm(p => ({ ...p, accident_type: v }))} /></Col>
               <Col xs={24} md={8}><div className="field-label">责任比例</div><Select disabled={!canEditSurveyForm} value={accidentForm.liability_level} options={[{ value: '全责', label: '全责' }, { value: '主责', label: '主责' }, { value: '同责', label: '同责' }, { value: '次责', label: '次责' }, { value: '无责', label: '无责' }]} onChange={(v) => setAccidentForm(p => ({ ...p, liability_level: v }))} /></Col>
               <Col xs={24} md={8}><div className="field-label">事故时间</div><Input type="datetime-local" disabled={!canEditSurveyForm} value={accidentForm.accident_time} onChange={(e) => setAccidentForm(p => ({ ...p, accident_time: e.target.value }))} /></Col>
-              <Col xs={24} md={8}><div className="field-label">事故省</div><Select disabled={!canEditSurveyForm} allowClear value={accidentForm.province || undefined} options={provinceOptions.map(v => ({ value: v, label: v }))} onChange={(v) => setAccidentForm(p => ({ ...p, province: v || '', city: '', district: '' }))} /></Col>
-              <Col xs={24} md={8}><div className="field-label">事故市</div><Select disabled={!canEditSurveyForm} allowClear value={accidentForm.city || undefined} options={cityOptions.map(v => ({ value: v, label: v }))} onChange={(v) => setAccidentForm(p => ({ ...p, city: v || '', district: '' }))} /></Col>
-              <Col xs={24} md={8}><div className="field-label">事故区（县）</div><Select disabled={!canEditSurveyForm} allowClear value={accidentForm.district || undefined} options={districtOptions.map(v => ({ value: v, label: v }))} onChange={(v) => setAccidentForm(p => ({ ...p, district: v || '' }))} /></Col>
+              <Col xs={24} md={8}><div className="field-label">事故省</div><Select showSearch optionFilterProp="label" disabled={!canEditSurveyForm} allowClear value={accidentForm.province || undefined} placeholder="选择省" options={regionOptions.map(p => ({ value: p.value, label: p.label }))} onChange={(v) => { const p = regionOptions.find(x => x.value === v) || null; setAccidentProvince(p); setAccidentCity(null); setAccidentForm(prev => ({ ...prev, province: p?.label || '', city: '', district: '' })); }} /></Col>
+              <Col xs={24} md={8}><div className="field-label">事故市</div><Select showSearch optionFilterProp="label" disabled={!canEditSurveyForm || !accidentProvince} allowClear value={accidentForm.city || undefined} placeholder={accidentProvince ? '选择市' : '请先选省'} options={(accidentProvince?.children || []).map(c => ({ value: c.value, label: c.label }))} onChange={(v) => { const c = accidentProvince?.children?.find(x => x.value === v) || null; setAccidentCity(c); setAccidentForm(prev => ({ ...prev, city: c?.label || '', district: '' })); }} /></Col>
+              <Col xs={24} md={8}><div className="field-label">事故区（县）</div><Select showSearch optionFilterProp="label" disabled={!canEditSurveyForm || !accidentCity} allowClear value={accidentForm.district || undefined} placeholder={accidentCity ? '选择区/县' : '请先选市'} options={(accidentCity?.children || []).map(d => ({ value: d.value, label: d.label }))} onChange={(v) => { const d = accidentCity?.children?.find(x => x.value === v) || null; setAccidentForm(prev => ({ ...prev, district: d?.label || '' })); }} /></Col>
               <Col xs={24} md={16}><div className="field-label">详细地点</div><Input disabled={!canEditSurveyForm} value={accidentForm.address_detail} onChange={(e) => setAccidentForm(p => ({ ...p, address_detail: e.target.value }))} /></Col>
               <Col xs={24} md={24}><div className="field-label">事故详细描述</div><Input.TextArea rows={2} disabled={!canEditSurveyForm} value={accidentForm.accident_desc} onChange={(e) => setAccidentForm(p => ({ ...p, accident_desc: e.target.value }))} /></Col>
               <Col xs={24} md={8}><div className="field-label">是否已报警</div><Switch disabled={!canEditSurveyForm} checked={accidentForm.has_alarm} onChange={(v) => setAccidentForm(p => ({ ...p, has_alarm: v }))} /></Col>

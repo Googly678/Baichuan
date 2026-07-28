@@ -37,24 +37,19 @@ async function ensureDbFile() {
 }
 
 export async function readIcdDb(): Promise<Icd10Database> {
-  await ensureKvDb();
-  if (!kvEnabled) {
-    if (!allowJsonFallback) {
-      throw new Error('数据库不可用，且未开启 JSON 回退');
+  // ICD-10 是静态参考数据（34226条），优先直接读文件，避免 KV/Prisma 连接问题
+  try {
+    return await readIcdDbFromFile();
+  } catch (fileErr) {
+    // 文件读取失败时尝试 KV 回退
+    try {
+      const existing = await kvGet<Icd10Database>(ICD_NAMESPACE, ICD_KEY);
+      if (existing && existing.items?.length > 0) return existing;
+    } catch {
+      // KV 也不可用
     }
-    return readIcdDbFromFile();
+    throw fileErr;
   }
-  const existing = await kvGet<Icd10Database>(ICD_NAMESPACE, ICD_KEY).catch(() => {
-    kvEnabled = false;
-    return null;
-  });
-  if (!existing) {
-    if (!allowJsonFallback) {
-      throw new Error('未找到 ICD10 键值数据');
-    }
-    return readIcdDbFromFile();
-  }
-  return existing;
 }
 
 export async function writeIcdDb(items: Icd10Record[]) {
