@@ -1290,8 +1290,8 @@ export default function TaskDetail() {
       // 立即保存最新数据（不依赖 setState 的异步更新）
       const payload = buildPersistedCase();
       // beforeunload 时必须用原生 fetch + keepalive（不能 await Promise）
-      // API base 通过 VITE_API_BASE_URL 在构建时注入；本地默认为空走 vite proxy
-      const apiBase = ((import.meta as any).env?.VITE_API_BASE_URL || '').replace(/\/$/, '');
+      // API base 通过 VITE_API_BASE_URL 在构建时注入；未配置时回退到 Render 生产地址
+      const apiBase = ((import.meta as any).env?.VITE_API_BASE_URL || 'https://rider-claims-api.onrender.com').replace(/\/$/, '');
       fetch(`${apiBase}/claims/${caseData.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
