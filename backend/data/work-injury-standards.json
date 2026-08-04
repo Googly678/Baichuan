@@ -1,0 +1,70 @@
+{
+  "items": [
+    {
+      "id": "CN-default-town",
+      "province": "全国默认",
+      "city": "",
+      "household_type": "城镇",
+      "disability_base_per_year": 52000,
+      "death_base_per_year": 52000,
+      "compensation_years": 20,
+      "updated_at": "2026/4/9 16:12:39",
+      "source": "内置演示基准（可替换为地方统计口径）"
+    },
+    {
+      "id": "CN-default-rural",
+      "province": "全国默认",
+      "city": "",
+      "household_type": "农村",
+      "disability_base_per_year": 28000,
+      "death_base_per_year": 28000,
+      "compensation_years": 20,
+      "updated_at": "2026/4/9 16:12:39",
+      "source": "内置演示基准（可替换为地方统计口径）"
+    },
+    {
+      "id": "SH-town",
+      "province": "上海市",
+      "city": "上海市",
+      "household_type": "城镇",
+      "disability_base_per_year": 84000,
+      "death_base_per_year": 84000,
+      "compensation_years": 20,
+      "updated_at": "2026/4/9 16:12:39",
+      "source": "演示样例"
+    },
+    {
+      "id": "SH-rural",
+      "province": "上海市",
+      "city": "上海市",
+      "household_type": "农村",
+      "disability_base_per_year": 56000,
+      "death_base_per_year": 56000,
+      "compensation_years": 20,
+      "updated_at": "2026/4/9 16:12:39",
+      "source": "演示样例"
+    },
+    {
+      "id": "GD-town",
+      "province": "广东省",
+      "city": "",
+      "household_type": "城镇",
+      "disability_base_per_year": 62000,
+      "death_base_per_year": 62000,
+      "compensation_years": 20,
+      "updated_at": "2026/4/9 16:12:39",
+      "source": "演示样例"
+    },
+    {
+      "id": "ZJ-town",
+      "province": "浙江省",
+      "city": "",
+      "household_type": "城镇",
+      "disability_base_per_year": 64000,
+      "death_base_per_year": 64000,
+      "compensation_years": 20,
+      "updated_at": "2026/4/9 16:12:39",
+      "source": "演示样例"
+    }
+  ]
+}

@@ -17,7 +17,13 @@ pnpm-debug.log*
 .pg-managed/
 
 # ─── 运行时数据 / 备份 ─────────────────────────
-data/
+# 静态参考数据（ICD-10 / 医院 / 配件 / 工伤标准）需提交到仓库以便 Render 部署；
+# 运行时数据（demo-db / core-db / auxiliary-data 等）与备份仍保持忽略。
+backend/data/*
+!backend/data/icd10-db.json
+!backend/data/hospital-db.json
+!backend/data/parts-db.json
+!backend/data/work-injury-standards.json
 backups/
 
 # ─── 构建产物 ───────────────────────────────────
