@@ -14,7 +14,7 @@ import {
   message,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { TASK_STATUS_ORDER, TASK_TYPE_LABEL } from '../utils/constants';
+import { TASK_STATUS_ORDER } from '../utils/constants';
 import { api } from '../utils/api';
 import type { ClaimCase } from '../types/claim';
 
@@ -24,6 +24,7 @@ const { RangePicker } = DatePicker;
 const CASE_TYPE_OPTIONS = [
   { value: 'rider_injury', label: '骑手人伤' },
   { value: 'third_injury', label: '三者人伤' },
+  { value: 'third_vehicle', label: '三者车损' },
   { value: 'third_property', label: '三者物损' },
 ];
 

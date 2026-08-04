@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Layout, Typography, Tag, Empty, Space, message, Spin, Button, Tooltip, Image, List, Alert, Modal, Select, Checkbox } from 'antd';
+import { Layout, Typography, Tag, Empty, Space, message, Spin, Button, Tooltip, List, Alert, Modal, Select, Checkbox } from 'antd';
 import {
   FileImageOutlined, FilePdfOutlined, FileTextOutlined,
   PaperClipOutlined, ZoomInOutlined, ZoomOutOutlined, UndoOutlined, RedoOutlined,
   UploadOutlined, DeleteOutlined, FolderOpenOutlined, BarcodeOutlined,
 } from '@ant-design/icons';
-import type { RcFile } from 'antd/es/upload';
 import { api } from '../utils/api';
 import { recognizeIDCard, recognizeMedical, recognizeInvoice, recognizeText, type IDCardResult, type MedicalResult, type InvoiceResult } from '../utils/ocrRecognizer';
-import type { AttachmentFile } from '../types/claim';
 
 const { Sider, Content } = Layout;
 const { Text, Title } = Typography;

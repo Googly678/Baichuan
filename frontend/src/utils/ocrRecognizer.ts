@@ -274,11 +274,3 @@ export const recognizeText = async (imageUrl: string): Promise<OCRResult> => {
     };
   }
 };
-
-// 清理资源
-export const terminateOCR = async () => {
-  if (worker) {
-    await worker.terminate();
-    worker = null;
-  }
-};

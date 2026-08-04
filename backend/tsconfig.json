@@ -5,6 +5,8 @@
     "moduleResolution": "Node16",
     "esModuleInterop": true,
     "strict": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,

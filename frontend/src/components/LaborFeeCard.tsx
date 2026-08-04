@@ -7,7 +7,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
-  Button, Card, Checkbox, Col, Empty, Input, InputNumber, List,
+  Button, Card, Checkbox, Col, Input, InputNumber, List,
   Modal, Row, Space, Table, Tag, Typography,
 } from 'antd';
 import {
@@ -71,10 +71,6 @@ const LaborFeeCard: React.FC<Props> = ({ canEdit, items, onChange }) => {
 
   const updateLaborFee = (id: string, fee: number) => {
     onChange(items.map((it) => (it.id === id ? { ...it, labor_fee: fee } : it)));
-  };
-
-  const updateReviewedPrice = (id: string, price: number) => {
-    onChange(items.map((it) => (it.id === id ? { ...it, reviewed_price: price } : it)));
   };
 
   const removeItem = (id: string) => {

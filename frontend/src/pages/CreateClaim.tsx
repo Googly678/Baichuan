@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { VEHICLE_TYPE_OPTIONS } from '../utils/constants';
 import { api, type RegionNode } from '../utils/api';
+import { useSiderWidthSync } from '../utils/useSiderWidthSync';
 
 export default function CreateClaim() {
   const navigate = useNavigate();
@@ -25,17 +26,7 @@ export default function CreateClaim() {
   }, []);
 
   // 同步侧边栏宽度到 CSS 变量（粘性按钮区 left 偏移使用）
-  useEffect(() => {
-    const sync = () => {
-      const el = document.querySelector<HTMLElement>('[data-sider-width]');
-      const w = el?.getAttribute('data-sider-width') || '220';
-      document.documentElement.style.setProperty('--sider-w', `${w}px`);
-    };
-    sync();
-    const obs = new MutationObserver(sync);
-    obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['data-sider-width'] });
-    return () => obs.disconnect();
-  }, []);
+  useSiderWidthSync();
 
   const onFinish = async (values: any) => {
     try {

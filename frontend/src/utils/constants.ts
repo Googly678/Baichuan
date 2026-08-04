@@ -1,27 +1,4 @@
 
-// ─── 角色 ───────────────────────────────────────────────
-export const ROLES: Record<string, { label: string; color: string; line?: string }> = {
-  CUSTOMER_SERVICE:     { label: '客服专员',     color: 'gold'                        },  // 接件 & 分流
-  ADMIN:                { label: '管理人',       color: 'volcano'                     },  // 主流程推进 & 审批
-  INJURY_SURVEYOR:      { label: '人伤查勘员',   color: 'cyan',      line: 'injury'   },
-  INJURY_AUDITOR:       { label: '人伤审核员',   color: 'geekblue',  line: 'injury'   },
-  PROPERTY_SURVEYOR:    { label: '物损查勘员',   color: 'green',     line: 'property' },
-  PROPERTY_AUDITOR:     { label: '物损审核员',   color: 'purple',    line: 'property' },
-  LITIGATION_OPERATOR:  { label: '诉讼作业岗',   color: 'magenta'                     },  // 诉讼录入/推进
-  LITIGATION_AUDITOR:   { label: '诉讼审核岗',   color: 'red'                         },  // 诉讼审核
-};
-
-/** 属于查勘员条线的角色 */
-export const SURVEYOR_ROLES = ['INJURY_SURVEYOR', 'PROPERTY_SURVEYOR'];
-/** 属于审核员条线的角色 */
-export const AUDITOR_ROLES  = ['INJURY_AUDITOR',  'PROPERTY_AUDITOR', 'LITIGATION_AUDITOR'];
-/** 人伤条线角色 */
-export const INJURY_ROLES   = ['INJURY_SURVEYOR', 'INJURY_AUDITOR'];
-/** 物损条线角色 */
-export const PROPERTY_ROLES = ['PROPERTY_SURVEYOR', 'PROPERTY_AUDITOR'];
-/** 诉讼条线角色 */
-export const LITIGATION_ROLES = ['LITIGATION_OPERATOR', 'LITIGATION_AUDITOR'];
-
 // ─── 5 个工作台定义 ──────────────────────────────────────
 export type WorkbenchKey = 'claim' | 'audit' | 'litigation' | 'auxiliary' | 'settings';
 
@@ -29,15 +6,14 @@ export interface WorkbenchDef {
   key: WorkbenchKey;
   label: string;
   path: string;          // 默认进入路径
-  iconKey: 'claim' | 'audit' | 'litigation' | 'auxiliary' | 'settings';
 }
 
 export const WORKBENCHES: WorkbenchDef[] = [
-  { key: 'claim',      label: '理赔工作台',   path: '/dashboard/claim',      iconKey: 'claim' },
-  { key: 'audit',      label: '审核工作台',   path: '/dashboard/audit',      iconKey: 'audit' },
-  { key: 'litigation', label: '诉讼工作台',   path: '/dashboard/litigation', iconKey: 'litigation' },
-  { key: 'auxiliary',  label: '辅助任务工作台', path: '/dashboard/auxiliary', iconKey: 'auxiliary' },
-  { key: 'settings',   label: '系统设置',     path: '/settings',             iconKey: 'settings' },
+  { key: 'claim',      label: '理赔工作台',   path: '/dashboard/claim' },
+  { key: 'audit',      label: '审核工作台',   path: '/dashboard/audit' },
+  { key: 'litigation', label: '诉讼工作台',   path: '/dashboard/litigation' },
+  { key: 'auxiliary',  label: '辅助任务工作台', path: '/dashboard/auxiliary' },
+  { key: 'settings',   label: '系统设置',     path: '/settings' },
 ];
 
 /** 角色 → 工作台可见性映射（按 `key` 过滤 WORKBENCHES） */
@@ -97,17 +73,6 @@ export const TASK_STATUS_COLOR: Record<string, string> = {
   SURVEY_APPROVED: 'geekblue',
   DONE: 'success',
 };
-
-export const TASK_STATUS_STEPS = [
-  'PENDING',
-  'SUBMITTED_REG',
-  'REG_APPROVED',
-  'SUBMITTED_AGREEMENT',
-  'AGREEMENT_APPROVED',
-  'SUBMITTED_SURVEY',
-  'SURVEY_APPROVED',
-  'DONE',
-];
 
 export type TaskFlowStatus =
   | 'PROCESSING'

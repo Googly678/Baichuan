@@ -1,5 +1,3 @@
-import fs from 'fs/promises';
-import path from 'path';
 import { kvGet, kvSet } from './kvStorage';
 
 export interface RepairOrderItem {
@@ -14,6 +12,9 @@ export interface RepairOrderItem {
   quantity: number;
   subtotal_msrp: number;     // price_msrp * quantity
   subtotal_market: number;   // price_market * quantity
+  repair_type: 'repair' | 'replace';
+  salvage_value: number;
+  repair_fee: number;
 }
 
 export interface RepairOrder {
@@ -34,7 +35,6 @@ export interface RepairOrder {
 
 const REPAIR_NAMESPACE = 'repair_orders';
 let kvEnabled = true;
-const allowJsonFallback = process.env.ALLOW_JSON_FALLBACK === 'true';
 
 // 内存索引：case_id -> order
 const orderIndex: Map<string, RepairOrder> = new Map();
@@ -50,9 +50,6 @@ async function loadIndexFromKv() {
       }
     }
   } catch {
-    if (!allowJsonFallback) {
-      // 静默降级
-    }
     kvEnabled = false;
   } finally {
     loaded = true;

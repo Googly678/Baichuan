@@ -95,6 +95,8 @@ export interface VehiclePart {
   price_msrp: number;
   price_market: number;
   vehicle_model_id: string;
+  is_assembly?: boolean;
+  child_of_assembly_id?: string;
 }
 
 export interface VehiclePartSearchResponse {
@@ -116,6 +118,9 @@ export interface RepairOrderItem {
   quantity: number;
   subtotal_msrp: number;
   subtotal_market: number;
+  repair_type: 'repair' | 'replace';
+  salvage_value: number;
+  repair_fee: number;
 }
 
 export interface RepairOrder {
@@ -320,13 +325,6 @@ export const api = {
     search.set('vin', vin);
     return request<{ model: VehicleModel | null }>(`/vehicles/search?${search.toString()}`);
   },
-  listVehicleModels: (keyword?: string) => {
-    const search = new URLSearchParams();
-    if (keyword) search.set('keyword', keyword);
-    return request<{ items: VehicleModel[] }>(`/vehicles/search?${search.toString()}`);
-  },
-  getVehicleCategories: (modelId: string) =>
-    request<{ items: VehiclePartCategory[] }>(`/vehicles/${modelId}/categories`),
   searchVehicleParts: (params: { vehicleModelId: string; category?: string; keyword?: string; page?: number; pageSize?: number }) => {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -348,7 +346,6 @@ export const api = {
 
   // 复勘任务
   listReInspections: () => request<{ items: ReInspectionTask[] }>('/re-inspections'),
-  getReInspection: (id: string) => request<ReInspectionTask>(`/re-inspections/${id}`),
   createReInspection: (payload: Partial<ReInspectionTask>) =>
     request<{ success: boolean; data: ReInspectionTask }>('/re-inspections', {
       method: 'POST',
@@ -364,7 +361,6 @@ export const api = {
 
   // 调查任务
   listInvestigations: () => request<{ items: InvestigationTask[] }>('/investigations'),
-  getInvestigation: (id: string) => request<InvestigationTask>(`/investigations/${id}`),
   createInvestigation: (payload: Partial<InvestigationTask>) =>
     request<{ success: boolean; data: InvestigationTask }>('/investigations', {
       method: 'POST',
@@ -380,7 +376,6 @@ export const api = {
 
   // 诉讼登记
   listLitigations: () => request<{ items: LitigationRecord[] }>('/litigations'),
-  getLitigation: (id: string) => request<LitigationRecord>(`/litigations/${id}`),
   createLitigation: (payload: Partial<LitigationRecord>) =>
     request<{ success: boolean; data: LitigationRecord }>('/litigations', {
       method: 'POST',
@@ -406,7 +401,6 @@ export const api = {
       const qs = search.toString();
       return request<AuxiliaryTask[]>(`/auxiliary-tasks${qs ? `?${qs}` : ''}`);
     },
-    get: (id: string) => request<AuxiliaryTask>(`/auxiliary-tasks/${id}`),
     create: (payload: Partial<AuxiliaryTask>) =>
       request<{ success: boolean; data: AuxiliaryTask }>('/auxiliary-tasks', {
         method: 'POST',

@@ -8,5 +8,5 @@ import React from 'react';
 import Dashboard from '../Dashboard';
 
 export default function AuditDashboard() {
-  return <Dashboard workbenchKey="audit" />;
+  return <Dashboard />;
 }

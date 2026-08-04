@@ -99,11 +99,6 @@ async function enqueueWrite<T>(job: () => Promise<T>): Promise<T> {
   return result;
 }
 
-export async function listCoreRecords() {
-  const db = await readCoreDb();
-  return db.records;
-}
-
 export async function findCoreRecord(caseNo: string) {
   const db = await readCoreDb();
   return db.records.find((item) => item.case_no === caseNo) || null;

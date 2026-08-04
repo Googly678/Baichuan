@@ -12,8 +12,6 @@ import {
   AuditOutlined,
   EnvironmentOutlined,
   TeamOutlined,
-  MedicineBoxOutlined,
-  CarOutlined,
   FileTextOutlined,
   ToolOutlined,
   PlusOutlined,

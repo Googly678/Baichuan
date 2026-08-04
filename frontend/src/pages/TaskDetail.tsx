@@ -2,19 +2,18 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Card, Descriptions, Button, Tag, Space, message, Steps, Table,
-  Select, Popconfirm, InputNumber, Input, Modal, Form, Divider,
-  Alert, Typography, Tooltip, Timeline, Switch, Row, Col, AutoComplete, Checkbox,
+  Select, Popconfirm, InputNumber, Input, Modal, Form,
+  Alert, Typography, Tooltip, Timeline, Switch, Row, Col, Checkbox,
 } from 'antd';
 import {
   SaveOutlined, WarningOutlined, LockOutlined, EditOutlined, PlusOutlined,
   AuditOutlined, CheckCircleOutlined,
-  SearchOutlined, CameraOutlined, PaperClipOutlined,
-  MedicineBoxOutlined, HomeOutlined, RiseOutlined, CarOutlined, UserOutlined,
+  SearchOutlined, CameraOutlined, PaperClipOutlined, CarOutlined,
 } from '@ant-design/icons';
 import { RoleContext } from '../App';
 import {
   INJURY_DETAIL_TYPES, PROPERTY_DETAIL_TYPES, DISABILITY_LEVEL,
-  IS_MOTOR_VEHICLE, TASK_STATUS_LABEL, TASK_STATUS_COLOR, TASK_TYPE_LABEL, deriveCaseStatusFromTasks, deriveTaskFlowStatus,
+  TASK_STATUS_LABEL, TASK_STATUS_COLOR, TASK_TYPE_LABEL, deriveCaseStatusFromTasks,
   VEHICLE_TYPE_OPTIONS,
 } from '../utils/constants';
 import VehiclePartsCard from '../components/VehiclePartsCard';
@@ -874,73 +873,6 @@ export default function TaskDetail() {
     return items;
   };
 
-  const recalcFromProperty = (info: PropertyInfo): LossItem[] => {
-    const items: LossItem[] = [];
-    if (info.vehicle_repair > 0)
-      items.push({ id: 'auto-vrepair', category: 'VEHICLE_REPAIR', amount: Math.max(0, info.vehicle_repair - (info.depreciation || 0)), remark: `维修¥${info.vehicle_repair} 扣折旧¥${info.depreciation || 0}`, audited: false });
-    if (info.towing_fee > 0)
-      items.push({ id: 'auto-towing', category: 'TOWING_FEE', amount: info.towing_fee, remark: '拖车施救费', audited: false });
-    if (info.personal_items > 0)
-      items.push({ id: 'auto-personal', category: 'PERSONAL_ITEMS', amount: info.personal_items, remark: '随车物品损失', audited: false });
-    if (info.other_fee > 0)
-      items.push({ id: 'auto-other', category: 'OTHER_PROPERTY', amount: info.other_fee, remark: '其他财产损失', audited: false });
-    return items;
-  };
-
-  const recalcFromRiderInjury = (form: RiderInjuryForm, medicals: RiderMedicalRecord[]): LossItem[] => {
-    const items: LossItem[] = [];
-    const medTotal = medicals.reduce((s, r) => s + (r.amount || 0), 0);
-    if (medTotal > 0)
-      items.push({ id: 'auto-rider-medical', category: 'MEDICAL_FEE', amount: medTotal, remark: `医疗费明细合计（${medicals.length}条）`, audited: false });
-
-    const lostWorkFee = (form.lost_work_days || 0) * (form.daily_wage_standard || 0);
-    if (lostWorkFee > 0)
-      items.push({ id: 'auto-rider-lostwork', category: 'LOST_INCOME', amount: lostWorkFee, remark: `${form.lost_work_days}天 × ¥${form.daily_wage_standard}/天`, audited: false });
-
-    const nursingFee = (form.nursing_days || 0) * (form.daily_nursing_fee || 0);
-    if (nursingFee > 0)
-      items.push({ id: 'auto-rider-nursing', category: 'NURSING_FEE', amount: nursingFee, remark: `${form.nursing_days}天 × ¥${form.daily_nursing_fee}/天`, audited: false });
-
-    if (form.is_fatal)
-      items.push({ id: 'auto-rider-death', category: 'DEATH_COMP', amount: 240000, remark: '死亡赔偿金（演示额）', audited: false });
-
-    return items;
-  };
-
-  const THIRD_INJURY_TO_CATEGORY: Record<string, string> = {
-    medical_fee: 'MEDICAL_FEE',
-    hospital_meal: 'NUTRITION_FEE',
-    nutrition: 'NUTRITION_FEE',
-    nursing: 'NURSING_FEE',
-    lost_work: 'LOST_INCOME',
-    transport: 'TRANSPORTATION_FEE',
-    disability_comp: 'DISABILITY_COMP',
-    mental_damage: 'MENTAL_COMP',
-    death_comp: 'DEATH_COMP',
-    funeral: 'FUNERAL_FEE',
-  };
-
-  const recalcFromThirdInjury = (items: ThirdInjuryItem[]): LossItem[] => {
-    return items
-      .filter((x) => (x.audited_amount || 0) > 0 || (x.claimed_amount || 0) > 0)
-      .map((x) => ({
-        id: `auto-third-${x.item_key}`,
-        category: THIRD_INJURY_TO_CATEGORY[x.item_key] || 'MENTAL_COMP',
-        amount: (x.audited_amount || 0) > 0 ? (x.audited_amount || 0) : (x.claimed_amount || 0),
-        remark: x.calc_basis || x.item_name,
-        audited: !!x.approved,
-      }));
-  };
-
-  const mergeAutoLossItems = (prev: LossItem[], nextAuto: LossItem[]) => {
-    const manualItems = prev.filter((x) => !x.id.startsWith('auto-'));
-    const prevAutoAudit = new Map(
-      prev.filter((x) => x.id.startsWith('auto-')).map((x) => [x.id, x.audited])
-    );
-    const normalizedAuto = nextAuto.map((x) => ({ ...x, audited: prevAutoAudit.get(x.id) ?? x.audited }));
-    return [...normalizedAuto, ...manualItems];
-  };
-
   const updateInjuryInfo = (key: keyof InjuryInfo, value: any) => {
     const next = { ...injuryInfo, [key]: value };
     setInjuryInfo(next);
@@ -1493,7 +1425,7 @@ export default function TaskDetail() {
     showCenteredConfirm(
       `确认取消项目：${removed.join('、')}？`,
       () => setSelectedLossTypes(next),
-      '取消后将从核损理算清单移除对应项目，避免误删请确认。'
+      '取消后将从立案估损计算器移除对应项目，避免误删请确认。'
     );
   };
 
@@ -1852,7 +1784,6 @@ export default function TaskDetail() {
     (role === 'INJURY_AUDITOR' && isInjuryTask) ||
     (role === 'PROPERTY_AUDITOR' && isPropertyTask)
   );
-  const isMotor = IS_MOTOR_VEHICLE[caseData.vehicle_type] || false;
 
   // ─── 核损清单表格列（损失项由上方信息录入自动生成，审核员对每行做审核标注）────
   const categoryOptions = isPropertyTask ? PROPERTY_DETAIL_TYPES : INJURY_DETAIL_TYPES;
@@ -2117,13 +2048,18 @@ export default function TaskDetail() {
             icon={<PaperClipOutlined />}
             onClick={() => {
               const ref = caseData.case_no || id;
+              const taskType = effectiveActiveTask?.task_type || '';
+              // HashRouter 路由：完整 URL 形如 `${baseUrl}#/attachments/<ref>?taskType=<type>`
               const baseUrl = (import.meta as any).env?.BASE_URL || '/';
-              const url = `${window.location.origin}${baseUrl.replace(/\/$/, '/')}#/attachments/${encodeURIComponent(ref || '')}`;
+              const hash = `/attachments/${encodeURIComponent(ref || '')}?taskType=${encodeURIComponent(taskType)}`;
+              const url = `${window.location.origin}${baseUrl.replace(/\/$/, '/')}#${hash}`;
               const opened = window.open(url, 'claim-attachments');
-              if (!opened) message.warning('浏览器拦截了附件窗口，请允许弹窗后重试。');
+              if (!opened) {
+                message.warning('浏览器拦截了单证管理窗口，请允许弹窗后重试。');
+              }
             }}
           >
-            附件查看
+            上传附件
           </Button>
         </div>
       </div>
@@ -2131,7 +2067,7 @@ export default function TaskDetail() {
   }
 
   return (
-    <div style={{ paddingBottom: 80 }} className="task-detail-dense">
+    <div style={{ paddingBottom: 32, marginTop: -16 }} className="task-detail-dense">
       <style>{`
         .task-detail-dense .ant-card .ant-card-head { min-height: 36px; }
         .task-detail-dense .ant-card .ant-card-head-title { padding: 6px 0; font-size: 13px; }
@@ -2411,22 +2347,6 @@ export default function TaskDetail() {
               <Col xs={24} md={12}><div className="field-label">工作单位</div><Input disabled={!canEditSurveyForm} value={workForm.company} onChange={(e) => setWorkForm(p => ({ ...p, company: e.target.value }))} /></Col>
               <Col xs={24} md={6}><div className="field-label">单位联系人电话</div><Input disabled={!canEditSurveyForm} value={workForm.company_contact_phone} onChange={(e) => setWorkForm(p => ({ ...p, company_contact_phone: e.target.value }))} /></Col>
               <Col xs={24} md={6}><div className="field-label">单位地址</div><Input disabled={!canEditSurveyForm} value={workForm.company_address} onChange={(e) => setWorkForm(p => ({ ...p, company_address: e.target.value }))} /></Col>
-            </Row>
-          </Card>
-
-          <Card bordered={false} style={{ marginBottom: 16 }} title="护理人信息">
-            <Row gutter={[12, 12]}>
-              <Col xs={24} md={6}><div className="field-label">职业类型</div><Select style={fullSelectStyle} disabled={!canEditSurveyForm} value={nursingForm.job_type} options={[{ value: '全职', label: '全职' }, { value: '兼职', label: '兼职' }]} onChange={(v) => setNursingForm(p => ({ ...p, job_type: v }))} /></Col>
-              <Col xs={24} md={6}><div className="field-label">所属行业</div><Select style={fullSelectStyle} disabled={!canEditSurveyForm} value={nursingForm.industry || undefined} options={[{ value: '护工', label: '护工' }, { value: '家属护理', label: '家属护理' }, { value: '服务业', label: '服务业' }, { value: '其他', label: '其他' }]} onChange={(v) => setNursingForm(p => ({ ...p, industry: v }))} /></Col>
-              <Col xs={24} md={6}><div className="field-label">工作年限</div><InputNumber disabled={!canEditSurveyForm} min={0} value={nursingForm.years} style={{ width: '100%' }} onChange={(v) => setNursingForm(p => ({ ...p, years: v || 0 }))} /></Col>
-              <Col xs={24} md={6}><div className="field-label">收入日标准</div><InputNumber disabled={!canEditSurveyForm} min={0} precision={2} value={nursingForm.day_income} style={{ width: '100%' }} onChange={(v) => {
-                const income = v || 0;
-                setNursingForm(p => ({ ...p, day_income: income }));
-                setInjurySettlementRows(prev => prev.map(x => x.id === 'settle-nursing' ? { ...x, standard: income } : x));
-              }} addonAfter="元/日" /></Col>
-              <Col xs={24} md={12}><div className="field-label">工作单位</div><Input disabled={!canEditSurveyForm} value={nursingForm.company} onChange={(e) => setNursingForm(p => ({ ...p, company: e.target.value }))} /></Col>
-              <Col xs={24} md={6}><div className="field-label">单位联系人电话</div><Input disabled={!canEditSurveyForm} value={nursingForm.company_contact_phone} onChange={(e) => setNursingForm(p => ({ ...p, company_contact_phone: e.target.value }))} /></Col>
-              <Col xs={24} md={6}><div className="field-label">单位地址</div><Input disabled={!canEditSurveyForm} value={nursingForm.company_address} onChange={(e) => setNursingForm(p => ({ ...p, company_address: e.target.value }))} /></Col>
             </Row>
           </Card>
 
@@ -2836,308 +2756,6 @@ export default function TaskDetail() {
         </>
       )}
 
-      {/* ══════════════════════════════════════════════════════════════════
-          ICD-10 伤情描述（人伤任务共用，骑手/三者均显示）
-       ══════════════════════════════════════════════════════════════════ */}
-      {false && isInjuryTask && (() => {
-        const D = !canEditSurveyForm;
-
-        // 常见外伤 ICD-10 编码（节选，实际可接后端搜索接口）
-        const ICD10_OPTIONS = [
-          { value: 'S00', label: 'S00 — 头部浅表损伤' },
-          { value: 'S01', label: 'S01 — 头部开放性伤口' },
-          { value: 'S02', label: 'S02 — 颅骨和面骨骨折' },
-          { value: 'S06', label: 'S06 — 颅内损伤' },
-          { value: 'S09', label: 'S09 — 头部其他和未特指损伤' },
-          { value: 'S10', label: 'S10 — 颈部浅表损伤' },
-          { value: 'S12', label: 'S12 — 颈椎骨折' },
-          { value: 'S14', label: 'S14 — 颈部神经和脊髓损伤' },
-          { value: 'S20', label: 'S20 — 胸部浅表损伤' },
-          { value: 'S22', label: 'S22 — 肋骨、胸骨和胸椎骨折' },
-          { value: 'S27', label: 'S27 — 胸腔内器官损伤' },
-          { value: 'S30', label: 'S30 — 腹部、腰部和骨盆浅表损伤' },
-          { value: 'S32', label: 'S32 — 腰椎和骨盆骨折' },
-          { value: 'S36', label: 'S36 — 腹部器官损伤' },
-          { value: 'S40', label: 'S40 — 肩和上臂浅表损伤' },
-          { value: 'S42', label: 'S42 — 肩和上臂骨折' },
-          { value: 'S50', label: 'S50 — 前臂浅表损伤' },
-          { value: 'S52', label: 'S52 — 前臂骨折' },
-          { value: 'S60', label: 'S60 — 腕和手浅表损伤' },
-          { value: 'S62', label: 'S62 — 腕和手骨折' },
-          { value: 'S70', label: 'S70 — 髋和大腿浅表损伤' },
-          { value: 'S72', label: 'S72 — 股骨骨折' },
-          { value: 'S79', label: 'S79 — 髋和大腿其他损伤' },
-          { value: 'S80', label: 'S80 — 膝和小腿浅表损伤' },
-          { value: 'S82', label: 'S82 — 小腿骨折含踝骨折' },
-          { value: 'S86', label: 'S86 — 膝以下肌肉和肌腱损伤' },
-          { value: 'S92', label: 'S92 — 足骨折' },
-          { value: 'T07', label: 'T07 — 多部位损伤' },
-          { value: 'T14', label: 'T14 — 未特指部位身体损伤' },
-        ];
-
-        const filteredICD = ICD10_OPTIONS.filter(o =>
-          !injuryDesc.icd_input ||
-          o.value.toLowerCase().includes(injuryDesc.icd_input.toLowerCase()) ||
-          o.label.includes(injuryDesc.icd_input)
-        );
-
-        return (
-          <Card
-            size="small"
-            title={<Space><MedicineBoxOutlined style={{ color: '#cf1322' }} /><b>伤情描述（ICD-10）</b></Space>}
-            style={{ marginBottom: 16 }}
-          >
-            <Row gutter={[12, 12]}>
-              <Col span={10}>
-                <div className="field-label">损伤诊断（ICD-10 检索）</div>
-                <AutoComplete
-                  disabled={D}
-                  style={{ width: '100%' }}
-                  value={injuryDesc.icd_input || (injuryDesc.icd_code ? `${injuryDesc.icd_code} — ${injuryDesc.icd_name}` : '')}
-                  options={filteredICD}
-                  filterOption={false}
-                  placeholder="输入编码或关键词搜索，如 S72 / 骨折"
-                  onChange={v => setID({ icd_input: v, icd_code: '', icd_name: '' })}
-                  onSelect={(val: string, opt: any) => {
-                    const parts = opt.label.split(' — ');
-                    setID({ icd_input: opt.label, icd_code: val, icd_name: parts[1] || '' });
-                  }}
-                  allowClear
-                  onClear={() => setID({ icd_input: '', icd_code: '', icd_name: '' })}
-                />
-              </Col>
-              <Col span={7}>
-                <div className="field-label">损伤性质</div>
-                <Select
-                  disabled={D}
-                  style={{ width: '100%' }}
-                  placeholder="请选择"
-                  value={injuryDesc.injury_nature || undefined}
-                  onChange={v => setID({ injury_nature: v })}
-                  options={[
-                    { value: '骨折', label: '骨折' },
-                    { value: '脱位', label: '脱位' },
-                    { value: '挫裂伤', label: '挫裂伤' },
-                    { value: '挫伤', label: '挫伤' },
-                    { value: '擦伤', label: '擦伤' },
-                    { value: '颅脑损伤', label: '颅脑损伤' },
-                    { value: '内脏损伤', label: '内脏损伤' },
-                    { value: '烧烫伤', label: '烧烫伤' },
-                    { value: '截肢', label: '截肢' },
-                    { value: '死亡', label: '死亡' },
-                    { value: '其他', label: '其他' },
-                  ]}
-                />
-              </Col>
-              <Col span={7}>
-                <div className="field-label">伤情等级</div>
-                <Select
-                  disabled={D}
-                  style={{ width: '100%' }}
-                  placeholder="请选择"
-                  value={injuryDesc.severity || undefined}
-                  onChange={v => setID({ severity: v })}
-                  options={[
-                    { value: '轻微伤', label: '轻微伤' },
-                    { value: '轻伤', label: '轻伤' },
-                    { value: '重伤', label: '重伤' },
-                    { value: '危重', label: '危重' },
-                    { value: '死亡', label: '死亡' },
-                  ]}
-                />
-              </Col>
-              <Col span={24}>
-                <div className="field-label">简要伤情说明</div>
-                <Input.TextArea
-                  disabled={D}
-                  rows={2}
-                  maxLength={300}
-                  showCount
-                  placeholder="简要描述受伤部位、损伤情况及初步诊断结论…"
-                  value={injuryDesc.description}
-                  onChange={e => setID({ description: e.target.value })}
-                />
-              </Col>
-            </Row>
-          </Card>
-        );
-      })()}
-
-      {/* ══════════════════════════════════════════════════════════════════
-          骑手人伤（rider_injury）— 按雇主责任险/意外险给付型流程录入
-          与三者责任险条款体系完全不同，独立处理
-       ══════════════════════════════════════════════════════════════════ */}
-      {false && isRiderInjuryTask && (() => {
-        const D = !canEditSurveyForm;
-        const f = (label: string, node: React.ReactNode, span = 8) => (
-          <Col span={span}>
-            <div style={{ marginBottom: 10 }}>
-              <div className="field-label" style={{ marginBottom: 3 }}>{label}</div>
-              {node}
-            </div>
-          </Col>
-        );
-        const ri = riderInjury;
-        const setRi = (patch: Partial<RiderInjuryForm>) => {
-          setRiderInjury((p) => {
-            const next = { ...p, ...patch };
-            setLossItems((prev) => mergeAutoLossItems(prev, recalcFromRiderInjury(next, riderMedicals)));
-            return next;
-          });
-        };
-        const setRiderMedicalsAndSync = (updater: (prev: RiderMedicalRecord[]) => RiderMedicalRecord[]) => {
-          setRiderMedicals((prev) => {
-            const next = updater(prev);
-            setLossItems((curr) => mergeAutoLossItems(curr, recalcFromRiderInjury(riderInjury, next)));
-            return next;
-          });
-        };
-
-        // 工伤伤残等级（按《劳动能力鉴定 职工工伤与职业病致残程度》）
-        const GONGSHANG_LEVELS = ['一级工伤','二级工伤','三级工伤','四级工伤','五级工伤','六级工伤','七级工伤','八级工伤','九级工伤','十级工伤'].map(v => ({ value: v, label: v }));
-        // 人身损害伤残等级（按《人身保险伤残评定标准》JR/T 0083-2013）
-        const YIWAI_LEVELS = ['一级伤残','二级伤残','三级伤残','四级伤残','五级伤残','六级伤残','七级伤残','八级伤残','九级伤残','十级伤残'].map(v => ({ value: v, label: v }));
-        const disabilityOpts = ri.insurance_type === 'employer' ? GONGSHANG_LEVELS : ri.insurance_type === 'accident' ? YIWAI_LEVELS : [];
-
-        const riderMedCols: any[] = [
-          { title: '就诊类型', dataIndex: 'visit_type', width: 100, render: (_: any, r: RiderMedicalRecord) => <Select disabled={D} value={r.visit_type || undefined} style={{ width: '100%' }} options={[{value:'门诊',label:'门诊'},{value:'住院',label:'住院'},{value:'急诊',label:'急诊'}]} onChange={v => setRiderMedicalsAndSync(prev => prev.map(x => x.id===r.id?{...x,visit_type:v}:x))} /> },
-          { title: '就诊医院', dataIndex: 'hospital', render: (_: any, r: RiderMedicalRecord) => <Input disabled={D} value={r.hospital} onChange={e => setRiderMedicalsAndSync(prev => prev.map(x => x.id===r.id?{...x,hospital:e.target.value}:x))} /> },
-          { title: '就诊日期', dataIndex: 'visit_date', width: 120, render: (_: any, r: RiderMedicalRecord) => <Input disabled={D} value={r.visit_date} placeholder="YYYY-MM-DD" onChange={e => setRiderMedicalsAndSync(prev => prev.map(x => x.id===r.id?{...x,visit_date:e.target.value}:x))} /> },
-          { title: '金额（元）', dataIndex: 'amount', width: 140, render: (_: any, r: RiderMedicalRecord) => <InputNumber disabled={D} min={0} precision={2} value={r.amount} style={{width:'100%'}} onChange={v => setRiderMedicalsAndSync(prev => prev.map(x => x.id===r.id?{...x,amount:v||0}:x))} /> },
-          { title: '备注/票据说明', dataIndex: 'remark', render: (_: any, r: RiderMedicalRecord) => <Input disabled={D} value={r.remark} onChange={e => setRiderMedicalsAndSync(prev => prev.map(x => x.id===r.id?{...x,remark:e.target.value}:x))} /> },
-          { title: '操作', width: 60, render: (_: any, r: RiderMedicalRecord) => !D && <Button type="link" danger size="small" onClick={() => setRiderMedicalsAndSync(prev => prev.filter(x => x.id!==r.id))}>删除</Button> },
-        ];
-        const medTotal = riderMedicals.reduce((s, r) => s + (r.amount || 0), 0);
-        const lostWorkFee = (ri.lost_work_days||0) * (ri.daily_wage_standard||0);
-        const nursingFee  = (ri.nursing_days||0)  * (ri.daily_nursing_fee||0);
-
-        return (
-          <>
-            {/* 工资收入 */}
-            <Card size="small" bordered style={{ marginBottom: 10 }}
-              title={<Space><span style={{color:'#52c41a',fontWeight:600}}>工资收入</span></Space>}>
-              <Row gutter={[12, 0]}>
-                {f('月均工资（元）', <InputNumber disabled={D} min={0} precision={2} value={ri.monthly_wage} style={{width:'100%'}} onChange={v => setRi({monthly_wage:v||0})} />)}
-                {f('工资发放形式', <Select disabled={D} value={ri.salary_form||undefined} style={{width:'100%'}} placeholder="请选择"
-                  options={[{value:'银行转账',label:'银行转账'},{value:'现金',label:'现金'},{value:'微信',label:'微信'},{value:'支付宝',label:'支付宝'}]}
-                  onChange={v => setRi({salary_form:v})} />)}
-                {f('在职年限（月）', <InputNumber disabled={D} min={0} value={ri.work_years} style={{width:'100%'}} addonAfter="月" onChange={v => setRi({work_years:v||0})} />)}
-                {f('工资证明材料', <Input disabled={D} value={ri.wage_proof_note} placeholder="如：提供近6个月银行流水、劳动合同" onChange={e => setRi({wage_proof_note:e.target.value})} />, 12)}
-              </Row>
-            </Card>
-
-            {/* 医疗费明细 */}
-            <Card size="small" bordered style={{ marginBottom: 10 }}
-              title={<Space><span style={{color:'#1677ff',fontWeight:600}}>医疗费明细</span>
-                <Tag color="blue">合计 ¥{medTotal.toFixed(2)}</Tag>
-              </Space>}
-              extra={!D && <Button size="small" onClick={() => setRiderMedicalsAndSync(prev => [...prev, {id:Date.now().toString(),visit_type:'',hospital:'',visit_date:'',amount:0,remark:''}])}>+ 新增记录</Button>}>
-              <Table dataSource={riderMedicals} columns={riderMedCols} rowKey="id" pagination={false} size="small" scroll={{x:800}} />
-            </Card>
-
-            {/* 误工 / 护理期 */}
-            <Card size="small" bordered style={{ marginBottom: 10 }}
-              title={<Space><span style={{color:'#722ed1',fontWeight:600}}>误工 / 护理期</span></Space>}>
-              <Row gutter={[12, 0]}>
-                {f('误工天数', <InputNumber disabled={D} min={0} value={ri.lost_work_days} style={{width:'100%'}} addonAfter="天" onChange={v => setRi({lost_work_days:v||0})} />)}
-                {f('日均误工费标准（元/天）', <InputNumber disabled={D} min={0} precision={2} value={ri.daily_wage_standard} style={{width:'100%'}} onChange={v => setRi({daily_wage_standard:v||0})} />)}
-                {f('误工费合计（自动）', <div style={{padding:'4px 11px',background:'#f0f7ff',borderRadius:6,fontWeight:'bold',color:'#1677ff'}}>¥{lostWorkFee.toFixed(2)}</div>)}
-                {f('护理天数', <InputNumber disabled={D} min={0} value={ri.nursing_days} style={{width:'100%'}} addonAfter="天" onChange={v => setRi({nursing_days:v||0})} />)}
-                {f('日均护理费（元/天）', <InputNumber disabled={D} min={0} precision={2} value={ri.daily_nursing_fee} style={{width:'100%'}} onChange={v => setRi({daily_nursing_fee:v||0})} />)}
-                {f('护理费合计（自动）', <div style={{padding:'4px 11px',background:'#f0f7ff',borderRadius:6,fontWeight:'bold',color:'#1677ff'}}>¥{nursingFee.toFixed(2)}</div>)}
-                {f('护理需求等级', <Select disabled={D} value={ri.nursing_level||undefined} style={{width:'100%'}} placeholder="请选择"
-                  options={[{value:'一级（完全护理）',label:'一级（完全护理）'},{value:'二级（大部分护理）',label:'二级（大部分护理）'},{value:'三级（部分护理）',label:'三级（部分护理）'},{value:'不需要',label:'不需要护理'}]}
-                  onChange={v => setRi({nursing_level:v})} />, 12)}
-              </Row>
-            </Card>
-
-            {/* 伤残鉴定 */}
-            <Card size="small" bordered style={{ marginBottom: 4 }}
-              title={<Space><span style={{color:'#eb2f96',fontWeight:600}}>伤残鉴定</span>
-                {ri.insurance_type && <Tag color={ri.insurance_type==='employer'?'volcano':'geekblue'}>
-                  {ri.insurance_type==='employer'?'适用工伤标准（GB/T 16180）':'适用人伤标准（JR/T 0083）'}
-                </Tag>}
-              </Space>}>
-              {!ri.insurance_type
-                ? <Alert type="warning" showIcon message="请先在顶部案件信息中选择承保险种，伤残鉴定标准将随险种联动" />
-                : <Row gutter={[12, 0]}>
-                  {f('伤残等级', <Select disabled={D} value={ri.disability_level||undefined} style={{width:'100%'}} placeholder="请选择伤残等级"
-                    options={disabilityOpts} onChange={v => setRi({disability_level:v})} />)}
-                  {f('鉴定机构', <Input disabled={D} value={ri.appraisal_org} placeholder="如：XX劳动能力鉴定委员会" onChange={e => setRi({appraisal_org:e.target.value})} />)}
-                  {f('鉴定日期', <Input disabled={D} value={ri.appraisal_date} placeholder="YYYY-MM-DD" onChange={e => setRi({appraisal_date:e.target.value})} />)}
-                  {f('鉴定报告编号', <Input disabled={D} value={ri.appraisal_no} onChange={e => setRi({appraisal_no:e.target.value})} />, 12)}
-                </Row>
-              }
-            </Card>
-          </>
-        );
-      })()}
-
-      {/* ══════════════════════════════════════════════════════════════════
-          三者人伤（third_injury）— 按车险/侵权责任险人伤赔偿标准
-          依据最高人民法院《人身损害赔偿司法解释》19项赔偿项目
-       ══════════════════════════════════════════════════════════════════ */}
-      {false && isThirdInjuryTask && (() => {
-        const D = !canEditSurveyForm;
-        const canAudit = canEdit && (role === 'INJURY_AUDITOR' || role === 'ADMIN');
-        const claimedTotal = thirdInjuryItems.reduce((s, r) => s + (r.claimed_amount||0), 0);
-        const auditedTotal = thirdInjuryItems.reduce((s, r) => s + (r.audited_amount||0), 0);
-        const approvedCount = thirdInjuryItems.filter(r => r.approved).length;
-
-        const updateItem = (id: string, patch: Partial<ThirdInjuryItem>) =>
-          setThirdInjuryItems(prev => {
-            const next = prev.map(x => x.id === id ? {...x,...patch} : x);
-            setLossItems(curr => mergeAutoLossItems(curr, recalcFromThirdInjury(next)));
-            return next;
-          });
-
-        const cols: any[] = [
-          { title: '#', dataIndex: 'id', width: 40, render: (v: string) => <span style={{color:'#999'}}>{v}</span> },
-          { title: '赔偿项目', dataIndex: 'item_name', width: 140, render: (v: string) => <span style={{fontWeight:600}}>{v}</span> },
-          { title: '请求金额（元）', dataIndex: 'claimed_amount', width: 160,
-            render: (_: any, r: ThirdInjuryItem) => <InputNumber disabled={D} min={0} precision={2} value={r.claimed_amount} style={{width:'100%'}} onChange={v => updateItem(r.id,{claimed_amount:v||0})} /> },
-          { title: '计算依据', dataIndex: 'calc_basis',
-            render: (_: any, r: ThirdInjuryItem) => <Input disabled={D} value={r.calc_basis} placeholder="如：住院7天×100元/天" onChange={e => updateItem(r.id,{calc_basis:e.target.value})} /> },
-          { title: '核损金额（元）', dataIndex: 'audited_amount', width: 160,
-            render: (_: any, r: ThirdInjuryItem) => <InputNumber disabled={!canAudit} min={0} precision={2} value={r.audited_amount} style={{width:'100%'}} onChange={v => updateItem(r.id,{audited_amount:v||0})} /> },
-          { title: '核准', dataIndex: 'approved', width: 70,
-            render: (_: any, r: ThirdInjuryItem) => <Switch disabled={!canAudit} checked={r.approved} size="small" checkedChildren="✓" unCheckedChildren="—" onChange={v => updateItem(r.id,{approved:v})} /> },
-        ];
-
-        return (
-          <Card bordered={false} style={{ marginBottom: 16 }} title={
-            <Space>
-              <UserOutlined style={{ color: '#1677ff' }} />
-              三者人伤赔偿项目录入
-              <Tag color="blue">请求 ¥{claimedTotal.toFixed(2)}</Tag>
-              {auditedTotal > 0 && <Tag color="purple">核损 ¥{auditedTotal.toFixed(2)}</Tag>}
-              {approvedCount > 0 && <Tag color="green">已核准 {approvedCount}/19 项</Tag>}
-              {activeTask && <Tag color="geekblue">{TASK_TYPE_LABEL[activeTask.task_type]}</Tag>}
-            </Space>
-          }>
-            <Table
-              dataSource={thirdInjuryItems}
-              columns={cols}
-              rowKey="id"
-              pagination={false}
-              size="small"
-              scroll={{ x: 800 }}
-              rowClassName={(r: ThirdInjuryItem) => r.approved ? '' : ''}
-              summary={() => (
-                <Table.Summary.Row style={{ background: '#fafafa', fontWeight: 'bold' }}>
-                  <Table.Summary.Cell index={0} colSpan={2}>合计</Table.Summary.Cell>
-                  <Table.Summary.Cell index={2}><span style={{color:'#cf1322'}}>¥{claimedTotal.toFixed(2)}</span></Table.Summary.Cell>
-                  <Table.Summary.Cell index={3} />
-                  <Table.Summary.Cell index={4}><span style={{color:'#722ed1'}}>¥{auditedTotal.toFixed(2)}</span></Table.Summary.Cell>
-                  <Table.Summary.Cell index={5}><Tag color="green" style={{fontWeight:'normal'}}>{approvedCount}/19</Tag></Table.Summary.Cell>
-                </Table.Summary.Row>
-              )}
-            />
-          </Card>
-        );
-      })()}
-
-      {/* ── 物损信息录入（仅物损任务显示，人伤任务不显示）── */}
       {/* ── 物损信息录入（仅物损任务显示，人伤任务不显示）── */}
       {isPropertyTask && (
         <Card bordered={false} style={{ marginBottom: 16 }}
@@ -3222,7 +2840,7 @@ export default function TaskDetail() {
         title={
           <Space>
             <AuditOutlined style={{ color: '#722ed1' }} />
-            核损理算清单
+            立案估损计算器
             <Tag color={lossItems.length > 0 ? 'purple' : 'default'}>
               {lossItems.length} 项 / 合计 ¥{lossItems.reduce((s, i) => s + (i.amount || 0), 0).toFixed(2)}
             </Tag>
@@ -3267,7 +2885,7 @@ export default function TaskDetail() {
       )}
 
       {!isCustomerSplitPending && (
-      <Card bordered={false} style={{ marginBottom: 80 }} title="情况说明">
+      <Card bordered={false} style={{ marginBottom: 16 }} title="情况说明">
         {auditLog.length > 0 && (() => {
           const MAX_VISIBLE = 5;
           const visibleLog = timelineExpanded ? auditLog : auditLog.slice(0, MAX_VISIBLE);
@@ -3695,7 +3313,7 @@ export default function TaskDetail() {
           </Form.Item>
           <Form.Item label="是否阻塞案件推进" name="blocking" valuePropName="checked">
             <input type="checkbox" defaultChecked style={{ marginRight: 8 }} />
-            调查完결前阻塞案件推进操作
+            调查完決前阻塞案件推进操作
           </Form.Item>
         </Form>
       </Modal>
@@ -3817,13 +3435,16 @@ export default function TaskDetail() {
                     { value: 'GROUP_ACCIDENT', label: '团体意外险（含附加三者）' },
                     { value: 'MOTOR_COMP', label: '摩托车综合险' },
                   ]}
+                  onChange={v => setRiderInjury(p => ({ ...p, insurance_type: v, disability_level: '' }))}
                 />
               </Form.Item>
             </Col>
+            <Col span={8}>
+              <Form.Item label="我方责任比例 (%)" name="liability_ratio">
+                <Input type="number" min={0} max={100} suffix="%" />
+              </Form.Item>
+            </Col>
           </Row>
-          <Form.Item label="我方责任比例 (%)" name="liability_ratio">
-            <Input type="number" min={0} max={100} suffix="%" />
-          </Form.Item>
         </Form>
       </Modal>
 

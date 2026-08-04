@@ -64,30 +64,3 @@ export async function kvSet<T>(namespace: string, key: string, value: T): Promis
     JSON.stringify(value)
   );
 }
-
-export async function kvDelete(namespace: string, key: string): Promise<void> {
-  await ensureTable();
-  await getPrismaClient().$executeRawUnsafe(
-    `DELETE FROM app_kv_store WHERE kv_namespace = $1 AND kv_key = $2`,
-    namespace,
-    key
-  );
-}
-
-export async function kvList<T>(namespace: string): Promise<Array<{ key: string; value: T; updatedAt: string }>> {
-  await ensureTable();
-  const rows = await getPrismaClient().$queryRawUnsafe<KvRow[]>(
-    `
-      SELECT kv_key, kv_value, updated_at
-      FROM app_kv_store
-      WHERE kv_namespace = $1
-      ORDER BY updated_at DESC
-    `,
-    namespace
-  );
-  return rows.map((row) => ({
-    key: row.kv_key,
-    value: row.kv_value as T,
-    updatedAt: row.updated_at.toISOString(),
-  }));
-}

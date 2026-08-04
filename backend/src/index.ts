@@ -45,7 +45,7 @@ const app = express();
 // CORS 白名单：本地开发 + GitHub Pages + Render 部署
 // 多个域名用逗号分隔，通过 ALLOWED_ORIGINS 环境变量配置
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ||
-  'http://localhost:5174,http://127.0.0.1:5174,http://localhost:3000,https://googly678.github.io,https://*.github.io'
+  'http://localhost:5174,http://127.0.0.1:5174,http://localhost:4173,http://127.0.0.1:4173,http://localhost:3000,https://googly678.github.io,https://*.github.io'
 ).split(',').map(s => s.trim()).filter(Boolean);
 
 app.use(cors({
@@ -67,7 +67,7 @@ app.use(express.json({ limit: '30mb' }));
 
 // 登录接口 (MOCK)
 app.post('/login', (req, res) => {
-  const { username, password } = req.body;
+  const { username } = req.body;
   if (!username) return res.status(401).json({ error: 'Username required' });
   let role = 'CUSTOMER_SERVICE';
   if (username.includes('injury-auditor')) role = 'INJURY_AUDITOR';
@@ -87,7 +87,7 @@ app.get('/regions', (_req, res) => {
   res.json(REGION_TREE);
 });
 
-app.get('/claims', async (req, res) => {
+app.get('/claims', async (_req, res) => {
   const claims = await listCases();
   res.json(claims.map((claim) => normalizeClaimStatuses(claim)));
 });
@@ -148,10 +148,8 @@ function calcPaymentTotal(payload: ClaimCase) {
   return (payload.payment_infos || []).reduce((sum, item) => sum + toSafeNumber(item.payment_amount), 0);
 }
 
-function applyApprovalSnapshot(current: ClaimCase, next: ClaimCase) {
-  const normalizedCurrent = normalizeClaimStatuses(current);
+function applyApprovalSnapshot(_current: ClaimCase, next: ClaimCase) {
   const normalizedNext = normalizeClaimStatuses(next);
-  const currentRank = APPROVAL_STATUS_ORDER[normalizedCurrent.status] ?? 0;
   const nextRank = APPROVAL_STATUS_ORDER[normalizedNext.status] ?? 0;
   const total = calcCaseLossTotal(next);
   const timestamp = nowText();
@@ -167,21 +165,6 @@ function applyApprovalSnapshot(current: ClaimCase, next: ClaimCase) {
   if (nextRank >= APPROVAL_STATUS_ORDER.SURVEY_APPROVED && !next.survey_approved_time) {
     next.survey_approved_time = timestamp;
     next.survey_amount = total;
-  }
-
-  if (normalizedNext.status !== normalizedCurrent.status) {
-    if (normalizedNext.status === 'REG_APPROVED' && currentRank < APPROVAL_STATUS_ORDER.REG_APPROVED) {
-      next.reg_approved_time = timestamp;
-      next.reg_amount = total;
-    }
-    if (normalizedNext.status === 'AGREEMENT_APPROVED' && currentRank < APPROVAL_STATUS_ORDER.AGREEMENT_APPROVED) {
-      next.agreement_approved_time = timestamp;
-      next.agreement_amount = total;
-    }
-    if (normalizedNext.status === 'SURVEY_APPROVED' && currentRank < APPROVAL_STATUS_ORDER.SURVEY_APPROVED) {
-      next.survey_approved_time = timestamp;
-      next.survey_amount = total;
-    }
   }
 }
 
@@ -351,7 +334,7 @@ app.put('/claims/:id', async (req, res) => {
 
     applyApprovalSnapshot(current, next);
 
-    const saved = await saveCase(req.params.id, normalizeClaimStatuses(next));
+    const saved = await saveCase(req.params.id, next);
     await syncCoreDbFromCase(saved);
     res.json(saved);
   } catch (err: any) {

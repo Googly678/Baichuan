@@ -1,6 +1,5 @@
-import fs from 'fs/promises';
 import path from 'path';
-import { kvGet, kvSet } from './kvStorage';
+import { createKvFileStorage } from './kvFileStorage';
 
 export interface WorkInjuryStandard {
   id: string;
@@ -17,13 +16,6 @@ export interface WorkInjuryStandard {
 interface WorkInjuryDatabase {
   items: WorkInjuryStandard[];
 }
-
-const dataDir = path.resolve(__dirname, '../data');
-const dataFile = path.resolve(dataDir, 'work-injury-standards.json');
-const WORK_INJURY_NAMESPACE = 'work_injury';
-const WORK_INJURY_KEY = 'primary';
-let kvEnabled = true;
-const allowJsonFallback = process.env.ALLOW_JSON_FALLBACK === 'true';
 
 function nowText() {
   return new Date().toLocaleString('zh-CN', { hour12: false });
@@ -100,62 +92,19 @@ const seedData: WorkInjuryDatabase = {
   ],
 };
 
-async function ensureDbFile() {
-  await fs.mkdir(dataDir, { recursive: true });
-  try {
-    await fs.access(dataFile);
-  } catch {
-    await fs.writeFile(dataFile, JSON.stringify(seedData, null, 2), 'utf-8');
-  }
-}
-
-async function readDb(): Promise<WorkInjuryDatabase> {
-  await ensureKvDb();
-  if (!kvEnabled) {
-    if (!allowJsonFallback) {
-      throw new Error('数据库不可用，且未开启 JSON 回退');
-    }
-    return readDbFromFile();
-  }
-  const existing = await kvGet<WorkInjuryDatabase>(WORK_INJURY_NAMESPACE, WORK_INJURY_KEY).catch(() => {
-    kvEnabled = false;
-    return null;
-  });
-  if (!existing) {
-    if (!allowJsonFallback) {
-      throw new Error('未找到工伤标准键值数据');
-    }
-    return readDbFromFile();
-  }
-  return existing;
-}
-
-async function ensureKvDb() {
-  if (!kvEnabled) return;
-  try {
-    const existing = await kvGet<WorkInjuryDatabase>(WORK_INJURY_NAMESPACE, WORK_INJURY_KEY);
-    if (existing) return;
-
-    const parsed = await readDbFromFile();
-    await kvSet(WORK_INJURY_NAMESPACE, WORK_INJURY_KEY, parsed);
-  } catch (error) {
-    if (!allowJsonFallback) throw error;
-    kvEnabled = false;
-  }
-}
-
-async function readDbFromFile(): Promise<WorkInjuryDatabase> {
-  await ensureDbFile();
-  const raw = await fs.readFile(dataFile, 'utf-8');
-  return JSON.parse(raw) as WorkInjuryDatabase;
-}
+const workInjuryStore = createKvFileStorage<WorkInjuryDatabase>({
+  dataFile: path.resolve(__dirname, '../data/work-injury-standards.json'),
+  seed: seedData,
+  namespace: 'work_injury',
+  key: 'primary',
+});
 
 export async function queryWorkInjuryStandard(params: {
   province?: string;
   city?: string;
   householdType?: string;
 }) {
-  const db = await readDb();
+  const db = await workInjuryStore.readDb();
   const province = (params.province || '').trim();
   const city = (params.city || '').trim();
   const householdType = (params.householdType || '').trim();

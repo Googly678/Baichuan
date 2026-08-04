@@ -9,5 +9,5 @@ import React from 'react';
 import Dashboard from '../Dashboard';
 
 export default function ClaimDashboard() {
-  return <Dashboard workbenchKey="claim" />;
+  return <Dashboard />;
 }

@@ -1,6 +1,5 @@
-import fs from 'fs/promises';
 import path from 'path';
-import { kvGet, kvSet } from './kvStorage';
+import { createKvFileStorage } from './kvFileStorage';
 
 export interface PartRecord {
   id: string;
@@ -13,6 +12,8 @@ export interface PartRecord {
   price_market: number;        // 4S 渠道市场价（元）
   vehicle_model_id: string;    // 关联车型 id
   image?: string;              // 占位图（演示用）
+  is_assembly?: boolean;       // 是否为总成件
+  child_of_assembly_id?: string; // 所属总成 id（若为子件）
 }
 
 export interface PartCategory {
@@ -44,13 +45,6 @@ interface PartsDatabase {
   models: VehicleModel[];
   parts: PartRecord[];
 }
-
-const dataDir = path.resolve(__dirname, '../data');
-const dataFile = path.resolve(dataDir, 'parts-db.json');
-const PARTS_NAMESPACE = 'vehicle_parts';
-const PARTS_KEY = 'primary';
-let kvEnabled = true;
-const allowJsonFallback = process.env.ALLOW_JSON_FALLBACK === 'true';
 
 const seedDatabase: PartsDatabase = {
   models: [
@@ -94,26 +88,31 @@ const seedDatabase: PartsDatabase = {
       id: 'p-62290ew000-999', oem_code: '62290EW000-999', name: '前保险杠中间加强件',
       original_name: '前保险杠支撑架,上', category: 'front_bumper', subcategory: '前保险杠中间加强件',
       price_msrp: 180, price_market: 120, vehicle_model_id: 'vm-lgbh12e20hy420076',
+      child_of_assembly_id: 'p-622a0ex70a-b151',
     },
     {
       id: 'p-96212ex70a-a229', oem_code: '96212EX70A-A229', name: '前保险杠牌照板',
       original_name: '支架-牌照', category: 'front_bumper', subcategory: '前保险杠牌照板',
       price_msrp: 95, price_market: 65, vehicle_model_id: 'vm-lgbh12e20hy420076',
+      child_of_assembly_id: 'p-622a0ex70a-b151',
     },
     {
       id: 'p-622a0ex70a-b151', oem_code: '622A0EX70A-B151', name: '前保险杠托架总成',
       original_name: '前保险杠孔盖板', category: 'front_bumper', subcategory: '前保险杠托架总成',
       price_msrp: 420, price_market: 280, vehicle_model_id: 'vm-lgbh12e20hy420076',
+      is_assembly: true,
     },
     {
       id: 'p-75115ew830-b124', oem_code: '75115EW830-B124', name: '前保险杠骨架支架（左）',
       original_name: '前侧梁,中左', category: 'front_bumper', subcategory: '前保险杠骨架支架（左）',
       price_msrp: 360, price_market: 245, vehicle_model_id: 'vm-lgbh12e20hy420076',
+      child_of_assembly_id: 'p-622a0ex70a-b151',
     },
     {
       id: 'p-75114ew830-b124', oem_code: '75114EW830-B124', name: '前保险杠骨架支架（右）',
       original_name: '前侧梁,右', category: 'front_bumper', subcategory: '前保险杠骨架支架（右）',
       price_msrp: 360, price_market: 245, vehicle_model_id: 'vm-lgbh12e20hy420076',
+      child_of_assembly_id: 'p-622a0ex70a-b151',
     },
     {
       id: 'p-k851e-ew51a-a176', oem_code: 'K851E-EW51A-A176', name: '副驾驶员安全气囊',
@@ -128,57 +127,15 @@ const seedDatabase: PartsDatabase = {
   ],
 };
 
-async function ensureDbFile() {
-  await fs.mkdir(dataDir, { recursive: true });
-  try {
-    await fs.access(dataFile);
-  } catch {
-    await fs.writeFile(dataFile, JSON.stringify(seedDatabase, null, 2), 'utf-8');
-  }
-}
-
-async function readDb(): Promise<PartsDatabase> {
-  await ensureKvDb();
-  if (!kvEnabled) {
-    if (!allowJsonFallback) {
-      throw new Error('数据库不可用，且未开启 JSON 回退');
-    }
-    return readDbFromFile();
-  }
-  const existing = await kvGet<PartsDatabase>(PARTS_NAMESPACE, PARTS_KEY).catch(() => {
-    kvEnabled = false;
-    return null;
-  });
-  if (!existing) {
-    if (!allowJsonFallback) {
-      throw new Error('未找到车辆配件键值数据');
-    }
-    return readDbFromFile();
-  }
-  return existing;
-}
-
-async function ensureKvDb() {
-  if (!kvEnabled) return;
-  try {
-    const existing = await kvGet<PartsDatabase>(PARTS_NAMESPACE, PARTS_KEY);
-    if (existing) return;
-    const parsed = await readDbFromFile();
-    await kvSet(PARTS_NAMESPACE, PARTS_KEY, parsed);
-  } catch (error) {
-    if (!allowJsonFallback) throw error;
-    kvEnabled = false;
-  }
-}
-
-async function readDbFromFile(): Promise<PartsDatabase> {
-  await ensureDbFile();
-  const raw = await fs.readFile(dataFile, 'utf-8');
-  return JSON.parse(raw) as PartsDatabase;
-}
+const partsStore = createKvFileStorage<PartsDatabase>({
+  dataFile: path.resolve(__dirname, '../data/parts-db.json'),
+  seed: seedDatabase,
+  namespace: 'vehicle_parts',
+  key: 'primary',
+});
 
 export async function searchVehicleByVin(vin: string) {
-  const db = await readDb();
+  const db = await partsStore.readDb();
   const normalized = (vin || '').trim().toUpperCase();
   if (!normalized) return null;
   // 演示：根据 VIN 前缀/完全匹配返回车型
@@ -191,7 +148,7 @@ export async function searchVehicleByVin(vin: string) {
 }
 
 export async function listVehicleModels(keyword?: string) {
-  const db = await readDb();
+  const db = await partsStore.readDb();
   const k = (keyword || '').trim().toLowerCase();
   if (!k) return db.models;
   return db.models.filter((m) =>
@@ -200,7 +157,7 @@ export async function listVehicleModels(keyword?: string) {
 }
 
 export async function getCategoriesByModel(modelId: string) {
-  const db = await readDb();
+  const db = await partsStore.readDb();
   const model = db.models.find((m) => m.id === modelId);
   return model?.categories || [];
 }
@@ -212,7 +169,7 @@ export async function searchParts(params: {
   page?: number;
   pageSize?: number;
 }) {
-  const db = await readDb();
+  const db = await partsStore.readDb();
   const page = Math.max(1, Number(params.page || 1));
   const pageSize = Math.max(1, Math.min(100, Number(params.pageSize || 20)));
   const k = (params.keyword || '').trim().toLowerCase();

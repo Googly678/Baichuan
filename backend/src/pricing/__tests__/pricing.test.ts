@@ -21,18 +21,15 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert/strict';
 
-import { decideOneLine } from '../selfPay';
 import { applyQuota } from '../quotas';
 import { matchMedicineAttr, isAttrActive, matchRegionParam } from '../snapshot';
 import { priceTask } from '../calc';
 import {
-  SAMPLE_MEDICINES,
   SAMPLE_ATTRS,
-  SAMPLE_REGION_PARAMS,
   DEFAULT_CLAUSE,
   makeContext,
 } from '../seed';
-import type { MedicalBill, DrugLine, ClauseConfig } from '../types';
+import type { MedicalBill, DrugLine } from '../types';
 
 // ─── 工具：构造一条 DrugLine ───────────────────────
 const line = (overrides: Partial<DrugLine>): DrugLine => ({

@@ -8,12 +8,12 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Button, Card, Checkbox, Col, Empty, Image, Input, List, message,
-  Modal, Row, Space, Table, Tag, Tooltip, Typography, InputNumber,
+  Button, Card, Checkbox, Col, Empty, Input, List, message,
+  Modal, Row, Space, Table, Tag, Tooltip, Typography, InputNumber, Radio,
 } from 'antd';
 import {
   CarOutlined, SearchOutlined, PictureOutlined, ReloadOutlined,
-  DeleteOutlined, SaveOutlined, PlusOutlined,
+  DeleteOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import {
   api,
@@ -45,7 +45,6 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
 
   const [order, setOrder] = useState<RepairOrder | null>(null);
   const [orderItems, setOrderItems] = useState<RepairOrderItem[]>([]);
-  const [saving, setSaving] = useState(false);
   const [orderLoaded, setOrderLoaded] = useState(false);
   const [partPickerOpen, setPartPickerOpen] = useState(false);
 
@@ -137,6 +136,9 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
           quantity: 1,
           subtotal_msrp: part.price_msrp,
           subtotal_market: part.price_market,
+          repair_type: 'replace',
+          salvage_value: 0,
+          repair_fee: 0,
         };
         return [...prev, item];
       }
@@ -146,6 +148,43 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
 
   const isPartSelected = (partId: string) =>
     orderItems.some((it) => it.part_id === partId);
+
+  // 总成/子件互斥：已选总成 → 禁用其子件；已选子件 → 禁用其总成
+  const disabledPartIds = useMemo(() => {
+    const disabled = new Set<string>();
+    const selectedIds = new Set(orderItems.map((it) => it.part_id));
+    // 建立总成 → 子件映射（基于当前显示的 parts）
+    const assemblyChildren = new Map<string, string[]>();
+    const childToAssembly = new Map<string, string>();
+    for (const p of parts) {
+      if (p.child_of_assembly_id) {
+        childToAssembly.set(p.id, p.child_of_assembly_id);
+        const children = assemblyChildren.get(p.child_of_assembly_id) || [];
+        children.push(p.id);
+        assemblyChildren.set(p.child_of_assembly_id, children);
+      }
+    }
+    for (const item of orderItems) {
+      const partId = item.part_id;
+      const part = parts.find(p => p.id === partId);
+      // 如果选中了总成，禁用其所有子件
+      if (part?.is_assembly) {
+        const children = assemblyChildren.get(partId) || [];
+        for (const childId of children) {
+          if (!selectedIds.has(childId)) disabled.add(childId);
+        }
+      }
+    }
+    // 如果选中了子件，禁用其总成
+    for (const item of orderItems) {
+      const partId = item.part_id;
+      const assemblyId = childToAssembly.get(partId);
+      if (assemblyId && !selectedIds.has(assemblyId)) {
+        disabled.add(assemblyId);
+      }
+    }
+    return disabled;
+  }, [orderItems, parts]);
 
   const updateQuantity = (id: string, quantity: number) => {
     setOrderItems((prev) => prev.map((it) => {
@@ -164,12 +203,43 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
     setOrderItems((prev) => prev.filter((it) => it.id !== id));
   };
 
-  const totalMsrp = useMemo(
-    () => orderItems.reduce((s, it) => s + it.subtotal_msrp, 0),
-    [orderItems],
-  );
+  const updateRepairType = (id: string, repairType: 'repair' | 'replace') => {
+    setOrderItems((prev) => prev.map((it) => {
+      if (it.id !== id) return it;
+      return {
+        ...it,
+        repair_type: repairType,
+        // 修→残值为0；换→维修费为0
+        salvage_value: repairType === 'repair' ? 0 : it.salvage_value,
+        repair_fee: repairType === 'replace' ? 0 : it.repair_fee,
+      };
+    }));
+  };
+
+  const updateSalvageValue = (id: string, salvageValue: number) => {
+    setOrderItems((prev) => prev.map((it) => {
+      if (it.id !== id) return it;
+      return { ...it, salvage_value: salvageValue || 0 };
+    }));
+  };
+
+  const updateRepairFee = (id: string, repairFee: number) => {
+    setOrderItems((prev) => prev.map((it) => {
+      if (it.id !== id) return it;
+      return { ...it, repair_fee: repairFee || 0 };
+    }));
+  };
+
   const totalMarket = useMemo(
     () => orderItems.reduce((s, it) => s + it.subtotal_market, 0),
+    [orderItems],
+  );
+  const totalRepairFee = useMemo(
+    () => orderItems.reduce((s, it) => s + (it.repair_fee || 0), 0),
+    [orderItems],
+  );
+  const totalSalvageValue = useMemo(
+    () => orderItems.reduce((s, it) => s + (it.salvage_value || 0), 0),
     [orderItems],
   );
 
@@ -177,37 +247,6 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
     if (!onTotalChange) return;
     onTotalChange(totalMarket);
   }, [totalMarket, onTotalChange]);
-
-  const handleSaveOrder = async () => {
-    if (!vehicle) {
-      message.warning('请先查询并确认车型');
-      return;
-    }
-    if (orderItems.length === 0) {
-      message.warning('请至少勾选一个配件');
-      return;
-    }
-    setSaving(true);
-    try {
-      const saved = await api.saveRepairOrder(caseId, {
-        task_id: taskId,
-        vehicle_model_id: vehicle.id,
-        vin: vehicle.vin,
-        brand: vehicle.brand,
-        series: vehicle.series,
-        trim: vehicle.trim,
-        items: orderItems,
-        total_msrp: totalMsrp,
-        total_market: totalMarket,
-      });
-      setOrder(saved);
-      message.success('维修工单已保存');
-    } catch (err: any) {
-      message.error(`保存工单失败：${err.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleClearOrder = async () => {
     if (!order) {
@@ -239,23 +278,63 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
 
   const orderColumns = [
     { title: '零件号', dataIndex: 'oem_code', width: 170 },
-    { title: '零件名称', dataIndex: 'name', width: 180 },
-    { title: '原厂零件名称', dataIndex: 'original_name', width: 200 },
+    { title: '零件名称', dataIndex: 'name', width: 150 },
+    { title: '原厂零件名称', dataIndex: 'original_name', width: 180 },
     {
-      title: '厂商指导价', dataIndex: 'price_msrp', width: 130,
+      title: '厂商指导价', dataIndex: 'price_msrp', width: 120,
       render: (v: number) => <span style={{ color: '#999' }}>¥{v.toFixed(2)}</span>,
     },
     {
-      title: '市场价', dataIndex: 'price_market', width: 120,
+      title: '市场价', dataIndex: 'price_market', width: 110,
       render: (v: number) => <span style={{ color: '#cf1322', fontWeight: 600 }}>¥{v.toFixed(2)}</span>,
     },
     {
-      title: '数量', dataIndex: 'quantity', width: 90,
+      title: '修/换', dataIndex: 'repair_type', width: 120,
+      render: (v: string, r: RepairOrderItem) => (
+        <Radio.Group
+          size="small"
+          value={v}
+          disabled={!canEdit}
+          onChange={(e) => updateRepairType(r.id, e.target.value)}
+          optionType="button"
+          buttonStyle="solid"
+        >
+          <Radio.Button value="repair">修</Radio.Button>
+          <Radio.Button value="replace">换</Radio.Button>
+        </Radio.Group>
+      ),
+    },
+    {
+      title: '数量', dataIndex: 'quantity', width: 80,
       render: (v: number, r: RepairOrderItem) => (
         <InputNumber
           size="small" min={1} value={v}
           disabled={!canEdit}
           onChange={(val) => updateQuantity(r.id, Number(val) || 1)}
+        />
+      ),
+    },
+    {
+      title: '残值金额', dataIndex: 'salvage_value', width: 120,
+      render: (v: number, r: RepairOrderItem) => (
+        <InputNumber
+          size="small" min={0} precision={2} value={v}
+          disabled={!canEdit}
+          style={{ width: '100%' }}
+          addonAfter="元"
+          onChange={(val) => updateSalvageValue(r.id, Number(val) || 0)}
+        />
+      ),
+    },
+    {
+      title: '维修费', dataIndex: 'repair_fee', width: 120,
+      render: (v: number, r: RepairOrderItem) => (
+        <InputNumber
+          size="small" min={0} precision={2} value={v}
+          disabled={!canEdit || r.repair_type === 'replace'}
+          style={{ width: '100%' }}
+          addonAfter="元"
+          onChange={(val) => updateRepairFee(r.id, Number(val) || 0)}
         />
       ),
     },
@@ -349,7 +428,7 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
         dataSource={orderItems}
         columns={orderColumns}
         locale={{ emptyText: orderLoaded ? '点击右上角「选择配件」按钮添加维修配件' : '加载中...' }}
-        scroll={{ x: 900 }}
+        scroll={{ x: 1300 }}
         summary={() =>
           orderItems.length > 0 ? (
             <Table.Summary fixed>
@@ -358,9 +437,18 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
                   <Text strong>合计</Text>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={1}>
+                  <Text style={{ fontSize: 12 }}>{orderItems.length} 项</Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={2}>
+                  <Text style={{ color: '#fa8c16' }}>¥{totalSalvageValue.toFixed(2)}</Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={3}>
+                  <Text style={{ color: '#1677ff' }}>¥{totalRepairFee.toFixed(2)}</Text>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={4}>
                   <Text strong style={{ color: '#cf1322' }}>¥{totalMarket.toFixed(2)}</Text>
                 </Table.Summary.Cell>
-                <Table.Summary.Cell index={2} />
+                <Table.Summary.Cell index={5} />
               </Table.Summary.Row>
             </Table.Summary>
           ) : null
@@ -437,15 +525,35 @@ const VehiclePartsCard: React.FC<Props> = ({ caseId, taskId, canEdit, onTotalCha
                 columns={[
                   {
                     title: '选择', dataIndex: 'id', width: 60,
-                    render: (_: any, r: VehiclePart) => (
-                      <Checkbox
-                        checked={isPartSelected(r.id)}
-                        disabled={!canEdit}
-                        onChange={(e) => togglePart(r, e.target.checked)}
-                      />
+                    render: (_: any, r: VehiclePart) => {
+                      const isDisabled = disabledPartIds.has(r.id) && !isPartSelected(r.id);
+                      return (
+                        <Tooltip title={
+                          r.is_assembly && disabledPartIds.has(r.id)
+                            ? '已选择该总成的子件，不可重复选择总成'
+                            : r.child_of_assembly_id && disabledPartIds.has(r.id)
+                            ? '已选择该配件的总成，不可重复选择子件'
+                            : ''
+                        }>
+                          <Checkbox
+                            checked={isPartSelected(r.id)}
+                            disabled={!canEdit || isDisabled}
+                            onChange={(e) => togglePart(r, e.target.checked)}
+                          />
+                        </Tooltip>
+                      );
+                    },
+                  },
+                  {
+                    title: '零件名称', dataIndex: 'name', width: 180,
+                    render: (v: string, r: VehiclePart) => (
+                      <Space size={4}>
+                        <span>{v}</span>
+                        {r.is_assembly && <Tag color="volcano" style={{ fontSize: 10, lineHeight: '16px' }}>总成</Tag>}
+                        {r.child_of_assembly_id && <Tag color="geekblue" style={{ fontSize: 10, lineHeight: '16px' }}>子件</Tag>}
+                      </Space>
                     ),
                   },
-                  { title: '零件名称', dataIndex: 'name', width: 180 },
                   { title: '原厂零件名称', dataIndex: 'original_name', width: 200 },
                   { title: '零件号', dataIndex: 'oem_code', width: 170 },
                   {

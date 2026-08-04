@@ -1,9 +1,9 @@
 ﻿import React, { useContext, useEffect, useMemo, useState } from 'react';
 import {
-  Card, Table, Tag, Space, Button, Badge, Row, Col, Statistic, Tabs, Typography, Tooltip, message,
+  Card, Table, Tag, Space, Button, Badge, Row, Col, Statistic, Tabs, Typography, message,
 } from 'antd';
 import {
-  ArrowRightOutlined, PlusOutlined, ClockCircleOutlined,
+  PlusOutlined, ClockCircleOutlined,
   CheckCircleOutlined, SyncOutlined, MedicineBoxOutlined, CarOutlined,
   FileSearchOutlined, AuditOutlined,
 } from '@ant-design/icons';
@@ -456,7 +456,7 @@ function getStats(role: string, cases: ClaimCase[]) {
 }
 
 // ─── 主组件 ─────────────────────────────────────────────────────────────────
-export default function Dashboard({ workbenchKey }: { workbenchKey?: import('../utils/constants').WorkbenchKey } = {}) {
+export default function Dashboard() {
   const navigate = useNavigate();
   const { role } = useContext(RoleContext);
   const [cases, setCases] = useState<ClaimCase[]>([]);

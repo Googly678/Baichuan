@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { RoleContext } from '../App';
 import { VEHICLE_TYPE_OPTIONS } from '../utils/constants';
 import { api, type RegionNode } from '../utils/api';
+import { useSiderWidthSync } from '../utils/useSiderWidthSync';
 
 const DRAFT_STORAGE_KEY = 'case_intake_draft';
 const DRAFT_AUTO_SAVE_INTERVAL = 5000; // 5 seconds
@@ -21,7 +22,6 @@ export default function CaseIntake() {
   const navigate = useNavigate();
   const { role } = useContext(RoleContext);
   const [form] = Form.useForm();
-  const draftSaveTimerRef = useRef<ReturnType<typeof setInterval>>();
   const lastFormValuesRef = useRef<any>();
   // 行政区三级联动（省/市/区）
   const [regionOptions, setRegionOptions] = useState<RegionNode[]>([]);
@@ -48,17 +48,7 @@ export default function CaseIntake() {
   }, []);
 
   // 同步侧边栏宽度到 CSS 变量（粘性按钮区 left 偏移使用）
-  useEffect(() => {
-    const sync = () => {
-      const el = document.querySelector<HTMLElement>('[data-sider-width]');
-      const w = el?.getAttribute('data-sider-width') || '220';
-      document.documentElement.style.setProperty('--sider-w', `${w}px`);
-    };
-    sync();
-    const obs = new MutationObserver(sync);
-    obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['data-sider-width'] });
-    return () => obs.disconnect();
-  }, []);
+  useSiderWidthSync();
 
   // 定期自动保存表单草稿
   useEffect(() => {

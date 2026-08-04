@@ -1,6 +1,5 @@
-import fs from 'fs/promises';
 import path from 'path';
-import { kvGet, kvSet } from './kvStorage';
+import { createKvFileStorage } from './kvFileStorage';
 
 export interface HospitalRecord {
   id: string;
@@ -14,13 +13,6 @@ export interface HospitalRecord {
 interface HospitalDatabase {
   items: HospitalRecord[];
 }
-
-const dataDir = path.resolve(__dirname, '../data');
-const dataFile = path.resolve(dataDir, 'hospital-db.json');
-const HOSPITAL_NAMESPACE = 'hospitals';
-const HOSPITAL_KEY = 'primary';
-let kvEnabled = true;
-const allowJsonFallback = process.env.ALLOW_JSON_FALLBACK === 'true';
 
 const regions = [
   { province: '上海市', city: '上海市', districts: ['浦东新区', '黄浦区', '徐汇区'] },
@@ -76,55 +68,12 @@ function generateSeedHospitals(): HospitalDatabase {
   return { items };
 }
 
-async function ensureDbFile() {
-  await fs.mkdir(dataDir, { recursive: true });
-  try {
-    await fs.access(dataFile);
-  } catch {
-    await fs.writeFile(dataFile, JSON.stringify(generateSeedHospitals(), null, 2), 'utf-8');
-  }
-}
-
-async function readDb(): Promise<HospitalDatabase> {
-  await ensureKvDb();
-  if (!kvEnabled) {
-    if (!allowJsonFallback) {
-      throw new Error('数据库不可用，且未开启 JSON 回退');
-    }
-    return readDbFromFile();
-  }
-  const existing = await kvGet<HospitalDatabase>(HOSPITAL_NAMESPACE, HOSPITAL_KEY).catch(() => {
-    kvEnabled = false;
-    return null;
-  });
-  if (!existing) {
-    if (!allowJsonFallback) {
-      throw new Error('未找到医院键值数据');
-    }
-    return readDbFromFile();
-  }
-  return existing;
-}
-
-async function ensureKvDb() {
-  if (!kvEnabled) return;
-  try {
-    const existing = await kvGet<HospitalDatabase>(HOSPITAL_NAMESPACE, HOSPITAL_KEY);
-    if (existing) return;
-
-    const parsed = await readDbFromFile();
-    await kvSet(HOSPITAL_NAMESPACE, HOSPITAL_KEY, parsed);
-  } catch (error) {
-    if (!allowJsonFallback) throw error;
-    kvEnabled = false;
-  }
-}
-
-async function readDbFromFile(): Promise<HospitalDatabase> {
-  await ensureDbFile();
-  const raw = await fs.readFile(dataFile, 'utf-8');
-  return JSON.parse(raw) as HospitalDatabase;
-}
+const hospitalStore = createKvFileStorage<HospitalDatabase>({
+  dataFile: path.resolve(__dirname, '../data/hospital-db.json'),
+  seed: generateSeedHospitals(),
+  namespace: 'hospitals',
+  key: 'primary',
+});
 
 export async function searchHospitals(params: {
   province?: string;
@@ -134,7 +83,7 @@ export async function searchHospitals(params: {
   page?: number;
   pageSize?: number;
 }) {
-  const db = await readDb();
+  const db = await hospitalStore.readDb();
   const keyword = (params.keyword || '').trim().toLowerCase();
   const page = Math.max(1, Number(params.page || 1));
   const pageSize = Math.max(1, Math.min(100, Number(params.pageSize || 20)));
